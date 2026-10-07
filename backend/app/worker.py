@@ -100,7 +100,7 @@ def run_job(job):
         if shutdown.is_set():
             db.query("UPDATE jobs SET status='queued' WHERE id=%s AND status='processing'", (job['id'],))
         else:
-            db.query("UPDATE jobs SET status='completed',progress=1,finished_at=now() WHERE id=%s AND status='processing'", (job['id'],))
+            db.query("UPDATE jobs SET status='completed',progress=1,processed_frames=%s,finished_at=now() WHERE id=%s AND status='processing'", (index,job['id']))
         db.query("UPDATE sources SET status='idle' WHERE id=%s", (source_id,))
     except Exception as exc:
         message = str(exc)[:400]
