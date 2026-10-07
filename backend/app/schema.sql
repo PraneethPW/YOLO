@@ -1,8 +1,11 @@
 CREATE TABLE IF NOT EXISTS users (
  id UUID PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
- password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','operator')),
+ password_hash TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','operator','visitor')),
  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS visitor_expires_at TIMESTAMPTZ;
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN ('admin','operator','visitor'));
 CREATE TABLE IF NOT EXISTS sessions (
  token_hash TEXT PRIMARY KEY, user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -25,6 +28,7 @@ CREATE TABLE IF NOT EXISTS jobs (
  processed_frames INTEGER NOT NULL DEFAULT 0, total_frames INTEGER NOT NULL DEFAULT 0,
  error TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), finished_at TIMESTAMPTZ
 );
+ALTER TABLE sources ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS jobs_queue ON jobs(status,created_at);
 CREATE TABLE IF NOT EXISTS incidents (
  id UUID PRIMARY KEY, source_id UUID NOT NULL REFERENCES sources(id), job_id UUID REFERENCES jobs(id),
@@ -55,3 +59,4 @@ CREATE TABLE IF NOT EXISTS events (
  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS events_created ON events(created_at);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES users(id);

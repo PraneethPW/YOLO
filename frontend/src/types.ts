@@ -1,4 +1,6 @@
-export type User={id:string;name:string;email:string;role:'admin'|'operator'};
+export type User={id:string;name:string;email:string;role:'admin'|'operator'|'visitor'};
+export type LiveEvent={kind:string;data:Record<string,unknown>};
+export type FrameResult={tracks:Track[];processing_fps:number;processing_ms:number;candidates:number;processed_at:string;image:string;frame_width:number;frame_height:number};
 export type Track={id:number;box:number[];class:string;confidence:number};
 export type Source={id:string;name:string;kind:'upload'|'webcam'|'stream';location:string;latitude:number|null;longitude:number|null;status:string;last_error:string|null;created_at:string;last_frame_at:string|null;tracks:Track[];fps:number};
 export type Job={id:string;source_id:string;source_name:string;original_name:string;status:string;progress:number;processed_frames:number;total_frames:number;error:string|null;created_at:string};

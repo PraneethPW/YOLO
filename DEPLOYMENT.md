@@ -3,7 +3,7 @@
 ## Railway backend
 
 1. Create a Railway project and backend service from `PraneethPW/YOLO` (branch `main`). Use `/backend` as its root directory. Build with the included `Dockerfile`. Set the service health check to `/api/health`, its timeout to 120 seconds, one replica, and disable sleeping. These settings live in Railway's service configuration. Legacy `railway.toml` configuration is deprecated by Railway and is not included.
-2. Attach a **persistent volume mounted at `/data`** before processing footage. Neon stores records; the volume stores original videos, evidence images, and latest camera frames. Without the volume, deploys lose those files.
+2. Attach a **persistent volume mounted at `/data`** before processing footage. Place the backend near the Neon database; this deployment uses Virginia (`us-east4-eqdc4a`). Neon stores records; the volume stores original videos, evidence images, and latest camera frames. Without the volume, deploys lose those files.
 3. Set server-only variables from `backend/.env.example`. Never put them in frontend build variables or GitHub source.
 4. Generate a public Railway domain. Health check: `/api/health`.
 
@@ -34,15 +34,15 @@ The CLI can deploy the `backend` directory with `railway up` once the project an
 2. Set **server-only** `BACKEND_URL` to the Railway HTTPS origin. No `VITE_` secret is needed.
 3. Deploy, then set Railway `FRONTEND_ORIGINS` to that exact production Vercel origin. Add preview origins explicitly if you need them.
 
-The included `/api` proxy keeps refresh cookies on the frontend's origin. It forwards bearer headers and streams live events. Video uploads and original-video downloads go directly to Railway using bearer authorization, bypassing Vercel function payload limits. The runtime endpoint exposes only the public backend origin. Direct file transfers require the correct CORS origin.
+The included `/api` proxy keeps refresh cookies on the frontend's origin. It forwards bearer headers and streams live events. Camera frames, video uploads, and original-video downloads go directly to Railway using bearer authorization, bypassing Vercel function payload limits. The runtime endpoint exposes only the public backend origin. Direct file transfers require the correct CORS origin.
 
 The Content Security Policy permits connections to `*.up.railway.app`. If using a custom backend domain, add that exact origin to `connect-src` in `frontend/vercel.json`.
 
 ## First access
 
-Open the production site and select **Start monitoring**. Create the administrator account with your name, email, and a password (12+ characters). No setup token is required. Only the first account becomes an administrator; concurrent requests cannot create additional administrators. Subsequent operators require single-use invitations created in Settings.
+Open the production site and choose **Use my camera** or **Analyze a video**. A private visitor session is created automatically. Select a real video to start processing immediately, or explicitly enable your camera in its analysis view. No location is fabricated. Visitor sessions last two hours and permit three sources, uploads up to 25 MB, and two uploads per five minutes. Their footage, events, jobs, and incident records are isolated from other visitors and the staff workspace. Ending the session stops its camera lease and cancels queued or active video jobs.
 
-Connect an uploaded-video source or webcam. Enter actual road/location details. Coordinates are optional, but maps need both latitude and longitude. Video files may be MP4, MOV, AVI, WebM, or MKV up to the configured limit.
+For the shared staff workspace, select **Operator sign in**. Create the first administrator account with your name, email, and a password (12+ characters). No setup token is required. Visitor sessions do not consume first-administrator setup. Concurrent setup requests cannot create additional administrators. Subsequent operators require single-use invitations created in Settings. Administrators can configure allowlisted CCTV sources and responder destinations. Staff uploads permit up to the configured upload limit (100 MB by default). Coordinates are optional; map markers require actual latitude and longitude.
 
 The application starts with empty operational data. It does not invent live cameras, accident detections, geographic locations, or sent alerts.
 
@@ -61,7 +61,7 @@ There are no default emergency recipients and no automatic call to 911, 112, pol
 
 ## Operational limits
 
-Three concurrent remote CCTV streams or three browser camera sessions are allowed. Actual processing throughput depends on CPU capacity. The detector samples uploaded footage at approximately four frames per second of source time. It does not calculate physical speed without calibration. Camera credentials embedded in stream URLs are rejected; use an allowlisted camera relay when authentication is needed.
+Three concurrent remote CCTV streams or three browser camera sessions are allowed. Browser capture sends at most two sampled frames per second, waiting for each actual result before sending the next. Annotated frames return directly with the inference response. The view displays received-frame age, actual analyzed rate, and capture-to-result latency. Camera leases expire after 60 seconds without a frame. Actual processing throughput depends on CPU capacity. The detector samples uploaded footage at approximately four frames per second of source time. It does not calculate physical speed without calibration. Camera credentials embedded in stream URLs are rejected; use an allowlisted camera relay when authentication is needed.
 
 Store only footage you are authorized to process. Back up Neon and the `/data` volume. The supplied application has no automatic retention deletion; choose and implement a retention period appropriate to your deployment before building a large video archive. Rotate database and AI keys through the providers and update server variables when needed.
 

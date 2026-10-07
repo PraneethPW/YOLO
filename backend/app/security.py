@@ -42,10 +42,13 @@ def password_ok(value, encoded):
 
 def session(user, response: Response):
     refresh = secrets.token_urlsafe(48)
+    expiry = user.get('visitor_expires_at') or datetime.now(timezone.utc) + timedelta(days=7)
+    if expiry <= datetime.now(timezone.utc):
+        raise HTTPException(401, 'Your private session has ended. Start a new session from the home page.')
     db.query('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(%s,%s,%s)',
-             (digest(refresh), user['id'], datetime.now(timezone.utc) + timedelta(days=7)))
+             (digest(refresh), user['id'], expiry))
     response.set_cookie('aa_refresh', refresh, httponly=True, secure=settings.cookie_secure,
-                        samesite='lax', max_age=604800, path='/api/auth')
+                        samesite='lax', max_age=max(1,int((expiry-datetime.now(timezone.utc)).total_seconds())), path='/api/auth')
     return access(user)
 
 
@@ -63,9 +66,16 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
         user = db.query('SELECT * FROM users WHERE id=%s', (payload['sub'],), one=True)
     except (jwt.PyJWTError, ValueError):
         raise HTTPException(401, 'Session expired')
-    if not user:
+    if not user or (user.get('visitor_expires_at') and user['visitor_expires_at'] <= datetime.now(timezone.utc)):
         raise HTTPException(401, 'Session expired')
     return user
+
+
+def source_scope(user, alias='s'):
+    # Public sessions see only their own footage; staff workspaces exclude visitor footage.
+    return (f"EXISTS (SELECT 1 FROM users owner WHERE owner.id={alias}.created_by AND "
+            "((%s='visitor' AND owner.id=%s) OR (%s<>'visitor' AND owner.role<>'visitor')))",
+            (user['role'],user['id'],user['role']))
 
 
 def admin(user=Depends(current_user)):

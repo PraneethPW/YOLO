@@ -6,6 +6,8 @@ The application never seeds example cameras, incidents, locations, metrics, or a
 
 ## Implemented workflows
 
+- Private two-hour visitor sessions: open a camera or upload a real video directly, with isolated footage and records.
+- Dedicated analysis views with annotated frames, tracked vehicles, received-frame age, actual camera roundtrip latency, job progress, cancellation, and retry from the stored video.
 - One-time administrator setup, password hashing, short-lived access tokens, rotating HttpOnly refresh cookies, operator invitations, and role checks.
 - Video upload, a durable processing queue, job progress, cancellation, restart recovery, vehicle tracking, and annotated frames.
 - Browser-camera frame ingestion and allowlisted RTSP/HTTP CCTV monitoring.
@@ -46,7 +48,7 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:5173`. Create the first administrator account with your name, email, and password. Once that account exists, new accounts require an invitation from Settings. No preset password exists in the source.
+Open `http://localhost:5173`. Choose **Use my camera** or **Analyze a video** to start a private visitor session. For a shared operations workspace, open **Operator sign in** and create the first administrator account with your name, email, and password. Once that account exists, new accounts require an invitation from Settings. No preset password exists in the source.
 
 The application uses a dedicated `accident_alert` database schema. `DATABASE_SCHEMA` can change it. Each transaction sets its search path to support Neon transaction pooling.
 

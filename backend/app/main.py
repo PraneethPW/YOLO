@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import csv
 import io
 import json
@@ -22,7 +23,7 @@ from . import db, worker
 from .config import settings
 from .detector import detector
 from .limits import BodyLimitMiddleware
-from .security import access,admin,audit,current_user,digest,hasher,password_ok,safe_url,session,throttle
+from .security import access,admin,audit,current_user,digest,hasher,password_ok,safe_url,session,throttle,source_scope
 
 logging.basicConfig(level=logging.INFO)
 frame_locks = {}
@@ -69,7 +70,7 @@ def health():
 
 @app.get('/api/auth/status')
 def setup_status():
-    return {'needs_setup': db.query('SELECT count(*) AS n FROM users',one=True)['n']==0}
+    return {'needs_setup': db.query("SELECT count(*) AS n FROM users WHERE role<>'visitor'",one=True)['n']==0}
 
 
 class Login(BaseModel):
@@ -91,7 +92,7 @@ def register(body:Register,request:Request,response:Response):
         raise HTTPException(422,'Enter a valid email address')
     with db.connection() as conn:
         conn.execute('SELECT pg_advisory_xact_lock(176421)')
-        first = conn.execute('SELECT id FROM users LIMIT 1').fetchone() is None
+        first = conn.execute("SELECT id FROM users WHERE role<>'visitor' LIMIT 1").fetchone() is None
         if not first:
             if not body.token:
                 raise HTTPException(403,'Administrator setup is complete. Ask your administrator for an invitation.')
@@ -111,7 +112,7 @@ def register(body:Register,request:Request,response:Response):
 @app.post('/api/auth/login')
 def login(body:Login,request:Request,response:Response):
     throttle(('login',request.client.host),10,300)
-    user = db.query('SELECT * FROM users WHERE email=%s',(body.email.strip().lower(),),one=True)
+    user = db.query("SELECT * FROM users WHERE email=%s AND role<>'visitor'",(body.email.strip().lower(),),one=True)
     if not user or not password_ok(body.password,user['password_hash']):
         raise HTTPException(401,'Email or password is incorrect')
     audit(user,'session.created')
@@ -121,6 +122,8 @@ def login(body:Login,request:Request,response:Response):
 @app.post('/api/auth/refresh')
 def refresh(request:Request,response:Response):
     token = request.cookies.get('aa_refresh','')
+    if not token:
+        raise HTTPException(401,'Please sign in or start a private session')
     with db.connection() as conn:
         row = conn.execute('DELETE FROM sessions WHERE token_hash=%s AND expires_at>now() RETURNING user_id', (digest(token),)).fetchone()
     if not row:
@@ -131,9 +134,26 @@ def refresh(request:Request,response:Response):
 
 @app.post('/api/auth/logout')
 def logout(request:Request,response:Response):
-    db.query('DELETE FROM sessions WHERE token_hash=%s',(digest(request.cookies.get('aa_refresh','')),))
+    previous=db.query('DELETE FROM sessions WHERE token_hash=%s RETURNING user_id',(digest(request.cookies.get('aa_refresh','')),),one=True)
+    if previous:
+        visitor=db.query("UPDATE users SET visitor_expires_at=now() WHERE id=%s AND role='visitor' RETURNING id",(previous['user_id'],),one=True)
+        if visitor:
+            ended=db.query("UPDATE sources SET status='idle',lease_expires_at=NULL WHERE created_by=%s RETURNING id",(visitor['id'],))
+            db.query("UPDATE jobs SET status='cancelled',finished_at=now() WHERE status IN ('queued','processing') AND source_id IN (SELECT id FROM sources WHERE created_by=%s)",(visitor['id'],))
+            for source in ended:
+                detector.reset(str(source['id']))
     response.delete_cookie('aa_refresh',path='/api/auth')
     return {'ok':True}
+
+
+@app.post('/api/auth/visitor')
+def visitor(request:Request,response:Response):
+    throttle(('visitor',request.client.host),30,60)
+    identity=uuid4()
+    user=db.query('''INSERT INTO users(id,email,name,password_hash,role,visitor_expires_at)
+                     VALUES(%s,%s,%s,%s,'visitor',now()+interval '2 hours') RETURNING *''',
+                     (identity,f'{identity}@visitor.invalid','Private session','!'),one=True)
+    return session(user,response)
 
 
 @app.post('/api/auth/invite')
@@ -150,7 +170,8 @@ SOURCE_FIELDS = 'id,name,kind,location,latitude,longitude,status,last_error,crea
 
 @app.get('/api/sources')
 def sources(user=Depends(current_user)):
-    return db.query(f'SELECT {SOURCE_FIELDS} FROM sources WHERE NOT archived ORDER BY created_at DESC')
+    scope,params=source_scope(user)
+    return db.query(f'SELECT {SOURCE_FIELDS} FROM sources s WHERE NOT archived AND {scope} ORDER BY created_at DESC',params)
 
 
 class SourceInput(BaseModel):
@@ -164,6 +185,8 @@ class SourceInput(BaseModel):
 
 @app.post('/api/sources',status_code=201)
 def create_source(body:SourceInput,user=Depends(current_user)):
+    if user['role']=='visitor' and db.query('SELECT count(*) AS n FROM sources WHERE created_by=%s AND NOT archived',(user['id'],),one=True)['n']>=3:
+        raise HTTPException(409,'Your session supports three sources. End one before connecting another.')
     if (body.latitude is None)!=(body.longitude is None):
         raise HTTPException(422,'Provide both latitude and longitude, or neither')
     if body.kind=='stream':
@@ -178,8 +201,10 @@ def create_source(body:SourceInput,user=Depends(current_user)):
     return source
 
 
-def get_source(identity):
-    row = db.query('SELECT * FROM sources WHERE id=%s AND NOT archived',(identity,),one=True)
+def get_source(identity,user,include_archived=False):
+    scope,params=source_scope(user)
+    archived = '' if include_archived else 'AND NOT archived'
+    row = db.query(f'SELECT s.* FROM sources s WHERE id=%s {archived} AND {scope}',(identity,*params),one=True)
     if not row:
         raise HTTPException(404,'Source was not found')
     return row
@@ -187,16 +212,19 @@ def get_source(identity):
 
 @app.post('/api/sources/{identity}/start')
 def start_source(identity:UUID,user=Depends(current_user)):
-    source = get_source(identity)
+    source = get_source(identity,user)
     if source['kind']=='stream':
         try:
             worker.start_stream(source)
         except ValueError as exc:
             raise HTTPException(409,str(exc))
     elif source['kind']=='webcam':
-        if db.query("SELECT count(*) AS n FROM sources WHERE kind='webcam' AND status='live'",one=True)['n']>=3 and source['status']!='live':
-            raise HTTPException(409,'Three webcam sessions are already active')
-        db.query("UPDATE sources SET status='live',last_error=NULL WHERE id=%s",(identity,))
+        with db.connection() as conn:
+            conn.execute('SELECT pg_advisory_xact_lock(176422)')
+            count=conn.execute("SELECT count(*) AS n FROM sources WHERE kind='webcam' AND status='live' AND lease_expires_at>now() AND id<>%s",(identity,)).fetchone()['n']
+            if count>=3:
+                raise HTTPException(409,'The three live camera slots are in use. Try again shortly or analyze a video.')
+            conn.execute("UPDATE sources SET status='live',last_error=NULL,lease_expires_at=now()+interval '60 seconds' WHERE id=%s",(identity,))
         detector.reset(str(identity))
     else:
         raise HTTPException(422,'Upload a video to start this source')
@@ -207,11 +235,11 @@ def start_source(identity:UUID,user=Depends(current_user)):
 
 @app.post('/api/sources/{identity}/stop')
 def stop_source(identity:UUID,user=Depends(current_user)):
-    source=get_source(identity)
+    source=get_source(identity,user)
     worker.stop_stream(identity)
     if source['kind']=='webcam':
         detector.reset(str(identity))
-    db.query("UPDATE sources SET status='idle' WHERE id=%s",(identity,))
+    db.query("UPDATE sources SET status='idle',lease_expires_at=NULL WHERE id=%s",(identity,))
     db.query("UPDATE jobs SET status='cancelled',finished_at=now() WHERE source_id=%s AND status IN ('queued','processing')",(identity,))
     audit(user,'source.stopped',identity)
     db.event('source',{'id':str(identity)})
@@ -219,7 +247,9 @@ def stop_source(identity:UUID,user=Depends(current_user)):
 
 
 @app.post('/api/sources/{identity}/archive')
-def archive_source(identity:UUID,user=Depends(admin)):
+def archive_source(identity:UUID,user=Depends(current_user)):
+    if user['role'] not in ('admin','visitor'):
+        raise HTTPException(403,'Administrator access required')
     stop_source(identity,user)
     db.query('UPDATE sources SET archived=true WHERE id=%s',(identity,))
     audit(user,'source.archived',identity)
@@ -228,7 +258,7 @@ def archive_source(identity:UUID,user=Depends(admin)):
 
 @app.post('/api/sources/{identity}/frame')
 async def webcam_frame(identity:UUID,file:UploadFile=File(...),user=Depends(current_user)):
-    source = await run_in_threadpool(get_source,identity)
+    source = await run_in_threadpool(get_source,identity,user)
     if source['kind']!='webcam' or source['status']!='live':
         raise HTTPException(409,'Start this webcam source first')
     throttle(('frame',str(identity)),120,60)
@@ -243,7 +273,9 @@ async def webcam_frame(identity:UUID,file:UploadFile=File(...),user=Depends(curr
         raise HTTPException(422,'Invalid image frame')
     async with lock:
         try:
-            return await run_in_threadpool(worker.process_frame,identity,frame,time.monotonic())
+            result = await run_in_threadpool(worker.process_frame,identity,frame,time.monotonic())
+            result['image'] = 'data:image/jpeg;base64,' + base64.b64encode((settings.media/f'{identity}-latest.jpg').read_bytes()).decode('ascii')
+            return result
         except Exception:
             await run_in_threadpool(db.query,"UPDATE sources SET status='error',last_error=%s WHERE id=%s",('Vision processing failed. Check model availability.',identity))
             raise HTTPException(503,'Vision processing failed. Check model availability.')
@@ -251,10 +283,13 @@ async def webcam_frame(identity:UUID,file:UploadFile=File(...),user=Depends(curr
 
 @app.post('/api/sources/{identity}/upload',status_code=202)
 async def upload(identity:UUID,file:UploadFile=File(...),user=Depends(current_user)):
-    source = await run_in_threadpool(get_source,identity)
+    source = await run_in_threadpool(get_source,identity,user)
     if source['kind']!='upload':
         raise HTTPException(422,'Select an uploaded-video source')
-    throttle(('upload',str(user['id'])),5,300)
+    throttle(('upload',str(user['id'])),2 if user['role']=='visitor' else 5,300)
+    if user['role']=='visitor' and db.query("SELECT count(*) AS n FROM jobs WHERE status IN ('queued','processing')",one=True)['n']>=8:
+        raise HTTPException(429,'The analysis queue is full. Please try again shortly.')
+    upload_limit = min(25,settings.max_upload_mb) if user['role']=='visitor' else settings.max_upload_mb
     ext = Path(file.filename or '').suffix.lower()
     if ext not in ('.mp4','.mov','.avi','.webm','.mkv'):
         raise HTTPException(422,'Choose MP4, MOV, AVI, WebM, or MKV')
@@ -265,8 +300,8 @@ async def upload(identity:UUID,file:UploadFile=File(...),user=Depends(current_us
         with path.open('wb') as out:
             while chunk := await file.read(1024*1024):
                 size += len(chunk)
-                if size>settings.max_upload_mb*1024*1024:
-                    raise HTTPException(413,f'Video exceeds {settings.max_upload_mb} MB limit')
+                if size>upload_limit*1024*1024:
+                    raise HTTPException(413,f'Video exceeds {upload_limit} MB limit')
                 out.write(chunk)
         if size==0:
             raise HTTPException(422,'Video is empty')
@@ -287,9 +322,31 @@ async def upload(identity:UUID,file:UploadFile=File(...),user=Depends(current_us
 
 @app.get('/api/jobs')
 def jobs(user=Depends(current_user)):
-    return db.query('''SELECT j.id,j.source_id,j.original_name,j.status,j.progress,j.processed_frames,
+    scope,params=source_scope(user)
+    return db.query(f'''SELECT j.id,j.source_id,j.original_name,j.status,j.progress,j.processed_frames,
                        j.total_frames,j.error,j.created_at,j.finished_at,s.name AS source_name
-                       FROM jobs j JOIN sources s ON s.id=j.source_id ORDER BY j.created_at DESC LIMIT 100''')
+                       FROM jobs j JOIN sources s ON s.id=j.source_id WHERE {scope} ORDER BY j.created_at DESC LIMIT 100''',params)
+
+
+@app.post('/api/jobs/{identity}/retry')
+def retry_job(identity:UUID,user=Depends(current_user)):
+    row=db.query('SELECT * FROM jobs WHERE id=%s',(identity,),one=True)
+    if not row:
+        raise HTTPException(404,'Video job was not found')
+    get_source(row['source_id'],user)
+    if not Path(row['path']).is_file():
+        raise HTTPException(404,'The original video is unavailable. Upload it again.')
+    throttle(('retry-video',str(user['id'])),3,300)
+    with db.connection() as conn:
+        conn.execute('SELECT id FROM sources WHERE id=%s FOR UPDATE',(row['source_id'],))
+        if conn.execute("SELECT id FROM jobs WHERE source_id=%s AND status IN ('queued','processing')",(row['source_id'],)).fetchone():
+            raise HTTPException(409,'This source already has an active analysis')
+        updated=conn.execute("UPDATE jobs SET status='queued',progress=0,processed_frames=0,error=NULL,finished_at=NULL WHERE id=%s AND status IN ('failed','cancelled') RETURNING id",(identity,)).fetchone()
+        if not updated:
+            raise HTTPException(409,'Only failed or cancelled analyses can be retried')
+        conn.execute("UPDATE sources SET status='idle',last_error=NULL WHERE id=%s",(row['source_id'],))
+    db.event('job',{'id':str(identity)})
+    return {'ok':True}
 
 
 INCIDENT_SELECT = '''SELECT i.*,s.name AS source_name,s.location,s.latitude,s.longitude,s.kind AS source_kind
@@ -299,13 +356,15 @@ INCIDENT_SELECT = '''SELECT i.*,s.name AS source_name,s.location,s.latitude,s.lo
 @app.get('/api/incidents')
 def incidents(status:str|None=None,search:str='',limit:int=100,user=Depends(current_user)):
     limit = max(1,min(limit,500))
-    return db.query(INCIDENT_SELECT+''' WHERE (%s::text IS NULL OR i.status=%s)
+    scope,params=source_scope(user)
+    return db.query(INCIDENT_SELECT+f''' WHERE {scope} AND (%s::text IS NULL OR i.status=%s)
                  AND (s.name ILIKE %s OR s.location ILIKE %s) ORDER BY i.detected_at DESC LIMIT %s''',
-                 (status,status,f'%{search[:200]}%',f'%{search[:200]}%',limit))
+                 (*params,status,status,f'%{search[:200]}%',f'%{search[:200]}%',limit))
 
 
-def get_incident(identity):
-    row = db.query(INCIDENT_SELECT+' WHERE i.id=%s',(identity,),one=True)
+def get_incident(identity,user):
+    scope,params=source_scope(user)
+    row = db.query(INCIDENT_SELECT+f' WHERE i.id=%s AND {scope}',(identity,*params),one=True)
     if not row:
         raise HTTPException(404,'Incident was not found')
     return row
@@ -318,6 +377,7 @@ class IncidentUpdate(BaseModel):
 
 @app.patch('/api/incidents/{identity}')
 def update_incident(identity:UUID,body:IncidentUpdate,user=Depends(current_user)):
+    get_incident(identity,user)
     with db.connection() as conn:
         row = conn.execute('SELECT * FROM incidents WHERE id=%s FOR UPDATE',(identity,)).fetchone()
         if not row:
@@ -327,13 +387,13 @@ def update_incident(identity:UUID,body:IncidentUpdate,user=Depends(current_user)
             raise HTTPException(409,'This incident has already changed. Refresh and try again.')
         conn.execute('UPDATE incidents SET status=%s,notes=%s,reviewed_by=%s,reviewed_at=now() WHERE id=%s',
                      (body.status,body.notes,user['id'],identity))
-        if body.status=='confirmed':
+        if body.status=='confirmed' and user['role']!='visitor':
             conn.execute('''INSERT INTO alert_deliveries(id,incident_id,target_id)
                         SELECT gen_random_uuid(),%s,id FROM alert_targets WHERE enabled
                         ON CONFLICT(incident_id,target_id) DO NOTHING''',(identity,))
     audit(user,'incident.'+body.status,identity)
     db.event('incident',{'id':str(identity),'status':body.status})
-    return get_incident(identity)
+    return get_incident(identity,user)
 
 
 @app.post('/api/incidents/{identity}/explain')
@@ -344,7 +404,7 @@ async def explain(identity:UUID,user=Depends(current_user)):
     model = settings.openrouter_model
     if model!='openrouter/free' and not model.endswith(':free'):
         raise HTTPException(503,'Only free OpenRouter models are permitted by this application')
-    incident = await run_in_threadpool(get_incident,identity)
+    incident = await run_in_threadpool(get_incident,identity,user)
     context = {k:incident[k] for k in ('status','score','signals','source_kind','video_seconds')}
     # Send only measured signal data. No footage, exact location, or credentials go to the LLM.
     try:
@@ -375,7 +435,7 @@ async def explain(identity:UUID,user=Depends(current_user)):
 
 @app.get('/api/sources/{identity}/snapshot')
 def source_snapshot(identity:UUID,user=Depends(current_user)):
-    get_source(identity)
+    get_source(identity,user)
     path = settings.media / f'{identity}-latest.jpg'
     if not path.exists():
         raise HTTPException(404,'No frame has been processed yet')
@@ -384,7 +444,7 @@ def source_snapshot(identity:UUID,user=Depends(current_user)):
 
 @app.get('/api/incidents/{identity}/snapshot')
 def incident_snapshot(identity:UUID,user=Depends(current_user)):
-    row = get_incident(identity)
+    row = get_incident(identity,user)
     path = settings.media / row['snapshot_path']
     if not path.is_file():
         raise HTTPException(404,'Evidence file is unavailable. Check persistent storage.')
@@ -393,7 +453,9 @@ def incident_snapshot(identity:UUID,user=Depends(current_user)):
 
 @app.get('/api/jobs/{identity}/video')
 def job_video(identity:UUID,user=Depends(current_user)):
-    row = db.query('SELECT path FROM jobs WHERE id=%s',(identity,),one=True)
+    row = db.query('SELECT path,source_id FROM jobs WHERE id=%s',(identity,),one=True)
+    if row:
+        get_source(row['source_id'],user,include_archived=True)
     if not row or not Path(row['path']).exists():
         raise HTTPException(404,'Source video is unavailable')
     return FileResponse(row['path'])
@@ -401,39 +463,49 @@ def job_video(identity:UUID,user=Depends(current_user)):
 
 @app.get('/api/stats')
 def stats(user=Depends(current_user)):
-    values = db.query('''SELECT count(*) AS total,count(*) FILTER(WHERE status='review') AS review,
-                        count(*) FILTER(WHERE status='confirmed') AS confirmed,
-                        count(*) FILTER(WHERE detected_at>now()-interval '24 hours') AS last_day FROM incidents''',one=True)
-    values['sources'] = db.query('SELECT count(*) AS n FROM sources WHERE NOT archived',one=True)['n']
-    values['live'] = db.query("SELECT count(*) AS n FROM sources WHERE status='live' AND last_frame_at>now()-interval '30 seconds' AND NOT archived",one=True)['n']
-    values['delivered'] = db.query("SELECT count(*) AS n FROM alert_deliveries WHERE status='delivered'",one=True)['n']
-    values['timeline'] = db.query('''SELECT date_trunc('day',detected_at) AS day,count(*) AS count FROM incidents
-                                    WHERE detected_at>now()-interval '7 days' GROUP BY 1 ORDER BY 1''')
+    scope,params=source_scope(user)
+    values=db.query(f'''SELECT count(*) AS total,count(*) FILTER(WHERE i.status='review') AS review,
+                        count(*) FILTER(WHERE i.status='confirmed') AS confirmed,
+                        count(*) FILTER(WHERE detected_at>now()-interval '24 hours') AS last_day
+                        FROM incidents i JOIN sources s ON s.id=i.source_id WHERE {scope}''',params,one=True)
+    counts=db.query(f'''SELECT count(*) AS sources,
+                       count(*) FILTER(WHERE status='live' AND last_frame_at>now()-interval '30 seconds') AS live
+                       FROM sources s WHERE NOT archived AND {scope}''',params,one=True)
+    values.update(counts)
+    values['delivered']=0 if user['role']=='visitor' else db.query("SELECT count(*) AS n FROM alert_deliveries WHERE status='delivered'",one=True)['n']
+    values['timeline']=db.query(f'''SELECT date_trunc('day',detected_at) AS day,count(*) AS count
+                                  FROM incidents i JOIN sources s ON s.id=i.source_id
+                                  WHERE detected_at>now()-interval '7 days' AND {scope} GROUP BY 1 ORDER BY 1''',params)
     return values
+
 
 
 @app.get('/api/events')
 async def events(request:Request,after:int=0,user=Depends(current_user)):
     async def stream():
-        cursor = max(0,after)
+        cursor = max(0,after) or (await run_in_threadpool(db.query,'SELECT coalesce(max(id),0) AS n FROM events',(),True))['n']
         # No token in URL. fetch-based SSE client supplies Authorization header.
         started = time.monotonic()
         while time.monotonic()-started<180:
             if await request.is_disconnected():
                 break
-            rows = await run_in_threadpool(db.query,'SELECT id,kind,payload FROM events WHERE id>%s ORDER BY id LIMIT 100',(cursor,))
+            rows = await run_in_threadpool(db.query,'''SELECT e.id,e.kind,e.payload FROM events e LEFT JOIN users u ON u.id=e.owner_id
+                WHERE e.id>%s AND ((%s='visitor' AND e.owner_id=%s) OR (%s<>'visitor' AND (u.role IS NULL OR u.role<>'visitor')))
+                ORDER BY e.id LIMIT 100''',(cursor,user['role'],user['id'],user['role']))
             if rows:
                 for row in rows:
                     cursor = row['id']
                     yield f'id: {cursor}\nevent: {row["kind"]}\ndata: {json.dumps(row["payload"],default=str)}\n\n'
             else:
                 yield ': heartbeat\n\n'
-            await asyncio.sleep(2)
+            await asyncio.sleep(0.6)
     return StreamingResponse(stream(),media_type='text/event-stream',headers={'X-Accel-Buffering':'no'})
 
 
 @app.get('/api/settings')
 def get_settings(user=Depends(current_user)):
+    if user['role']=='visitor':
+        return {'max_upload_mb':min(25,settings.max_upload_mb),'targets':[],'visitor':True}
     result = {'ai_connected':bool(settings.openrouter_api_key),'ai_model':settings.openrouter_model,
               'max_upload_mb':settings.max_upload_mb,'auto_alert_candidates':settings.auto_alert_candidates,
               'vision_model':settings.yolo_model,'database':'Neon PostgreSQL',
@@ -474,6 +546,8 @@ def toggle_target(identity:UUID,body:TargetUpdate,user=Depends(admin)):
 
 @app.get('/api/alerts')
 def alerts(user=Depends(current_user)):
+    if user['role']=='visitor':
+        return []
     return db.query('''SELECT d.*,t.name AS target_name FROM alert_deliveries d
                        JOIN alert_targets t ON t.id=d.target_id ORDER BY d.created_at DESC LIMIT 100''')
 
@@ -491,12 +565,13 @@ def retry_alert(identity:UUID,user=Depends(admin)):
 @app.get('/api/audit')
 def audit_log(user=Depends(admin)):
     return db.query('''SELECT a.*,u.name AS actor FROM audit_log a LEFT JOIN users u ON u.id=a.actor_id
-                       ORDER BY a.created_at DESC LIMIT 100''')
+                       WHERE u.role IS NULL OR u.role<>'visitor' ORDER BY a.created_at DESC LIMIT 100''')
 
 
 @app.get('/api/export')
 def export(user=Depends(current_user)):
-    rows = db.query(INCIDENT_SELECT+' ORDER BY i.detected_at DESC LIMIT 10000')
+    scope,params=source_scope(user)
+    rows = db.query(INCIDENT_SELECT+f' WHERE {scope} ORDER BY i.detected_at DESC LIMIT 10000',params)
     out = io.StringIO()
     fields = ['id','detected_at','source_name','location','latitude','longitude','status','score','notes']
     writer = csv.DictWriter(out,fields,extrasaction='ignore')

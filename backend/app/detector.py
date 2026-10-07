@@ -9,16 +9,24 @@ class Detector:
         self.verifiers = {}
         self.lock = threading.Lock()
         self.error = None
+        self.runtime_configured = False
 
     def analyze(self, source_id, frame, timestamp):
         from ultralytics import YOLO
+        import torch
         with self.lock:
+            if not self.runtime_configured:
+                torch.set_num_threads(2)
+                self.runtime_configured = True
             if source_id not in self.models:
                 # A separate tracker per source prevents track identity leaking between cameras.
                 self.models[source_id] = YOLO(settings.yolo_model)
                 self.verifiers[source_id] = MotionVerifier()
             result = self.models[source_id].track(frame, persist=True, tracker='bytetrack.yaml',
                 classes=[2,3,5,7], conf=0.35, imgsz=640, verbose=False, device='cpu')[0]
+            # Ultralytics device setup changes the thread count on first inference.
+            # Keep subsequent inference within this service's two CPU allocation.
+            torch.set_num_threads(2)
             tracks = []
             if result.boxes.id is not None:
                 for box, identity, cls, confidence in zip(result.boxes.xyxy.cpu().tolist(),

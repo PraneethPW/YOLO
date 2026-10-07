@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 import cv2
 import httpx
+from psycopg import OperationalError, InterfaceError
 from . import db
 from .config import settings
 from .detector import detector
@@ -33,8 +34,10 @@ def save_jpeg(filename, frame):
 
 def enqueue_alerts(incident_id):
     db.query('''INSERT INTO alert_deliveries(id,incident_id,target_id)
-                SELECT gen_random_uuid(),%s,id FROM alert_targets WHERE enabled
-                ON CONFLICT(incident_id,target_id) DO NOTHING''', (incident_id,))
+                SELECT gen_random_uuid(),%s,t.id FROM alert_targets t WHERE t.enabled
+                AND EXISTS (SELECT 1 FROM incidents i JOIN sources s ON s.id=i.source_id
+                            JOIN users u ON u.id=s.created_by WHERE i.id=%s AND u.role<>'visitor')
+                ON CONFLICT(incident_id,target_id) DO NOTHING''', (incident_id,incident_id))
     db.event('alert', {'incident_id': str(incident_id)})
 
 
@@ -48,9 +51,18 @@ def process_frame(source_id, frame, timestamp, job_id=None, video_seconds=None):
     tracks,candidates,annotated = detector.analyze(str(source_id), frame, timestamp)
     save_jpeg(f'{source_id}-latest.jpg', annotated)
     fps = round(1/max(0.001,time.monotonic()-started),2)
-    db.query('UPDATE sources SET tracks=%s::jsonb,fps=%s,last_frame_at=now(),last_error=NULL WHERE id=%s',
-             (json.dumps(tracks), fps,source_id))
+    updated = db.query("""WITH updated AS (
+        UPDATE sources SET tracks=%s::jsonb,fps=%s,last_frame_at=now(),last_error=NULL,
+        lease_expires_at=CASE WHEN kind='webcam' THEN now()+interval '60 seconds' ELSE NULL END
+        WHERE id=%s RETURNING id,tracks,fps,last_frame_at,created_by
+    ), published AS (
+        INSERT INTO events(kind,payload,owner_id)
+        SELECT 'frame',jsonb_build_object('id',id,'tracks',tracks,'fps',fps,'last_frame_at',last_frame_at),created_by
+        FROM updated RETURNING id
+    ) SELECT last_frame_at FROM updated,published""",(json.dumps(tracks),fps,source_id),one=True)
     for candidate in candidates:
+        if job_id and db.query('SELECT id FROM incidents WHERE job_id=%s AND video_seconds=%s',(job_id,video_seconds),one=True):
+            continue
         incident_id = uuid4()
         snapshot = save_jpeg(f'{incident_id}.jpg', annotated)
         db.query('''INSERT INTO incidents(id,source_id,job_id,score,signals,snapshot_path,video_seconds)
@@ -61,6 +73,7 @@ def process_frame(source_id, frame, timestamp, job_id=None, video_seconds=None):
             # Explicit operator configuration: message remains marked UNCONFIRMED.
             enqueue_alerts(incident_id)
     return {'tracks': tracks, 'processing_fps': fps, 'candidates': len(candidates),
+            'processed_at':updated['last_frame_at'],'processing_ms':round((time.monotonic()-started)*1000),
             'frame_width': annotated.shape[1], 'frame_height': annotated.shape[0]}
 
 
@@ -103,7 +116,12 @@ def run_job(job):
             db.query("UPDATE jobs SET status='completed',progress=1,processed_frames=%s,finished_at=now() WHERE id=%s AND status='processing'", (index,job['id']))
         db.query("UPDATE sources SET status='idle' WHERE id=%s", (source_id,))
     except Exception as exc:
-        message = str(exc)[:400]
+        if isinstance(exc, (OperationalError, InterfaceError)):
+            message = 'Analysis was interrupted by a connection problem. Retry using your saved video.'
+        elif isinstance(exc, ValueError):
+            message = str(exc)[:400]
+        else:
+            message = 'Video analysis stopped unexpectedly. Retry using your saved video.'
         log.error('Video processing failed: %s', type(exc).__name__)
         db.query("UPDATE jobs SET status='failed',error=%s,finished_at=now() WHERE id=%s", (message,job['id']))
         db.query("UPDATE sources SET status='error',last_error=%s WHERE id=%s", (message,source_id))
@@ -230,6 +248,19 @@ def start():
     db.query("UPDATE sources SET status='idle' WHERE status IN ('live','processing')")
     threading.Thread(target=video_worker,daemon=True).start()
     threading.Thread(target=alert_worker,daemon=True).start()
+    threading.Thread(target=lease_worker,daemon=True).start()
+
+
+def lease_worker():
+    while not shutdown.wait(10):
+        try:
+            stale=db.query("UPDATE sources SET status='idle',lease_expires_at=NULL WHERE kind='webcam' AND status='live' AND lease_expires_at<now() RETURNING id")
+            for source in stale:
+                detector.reset(str(source['id']))
+                db.event('source',{'id':str(source['id'])})
+            db.query("UPDATE jobs SET status='cancelled',finished_at=now() WHERE status IN ('queued','processing') AND source_id IN (SELECT s.id FROM sources s JOIN users u ON u.id=s.created_by WHERE u.role='visitor' AND u.visitor_expires_at<now())")
+        except Exception as exc:
+            log.error('Camera lease recovery failed: %s',type(exc).__name__)
 
 
 def stop():

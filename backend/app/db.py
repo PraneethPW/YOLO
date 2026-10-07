@@ -1,8 +1,10 @@
 import json
 import re
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from psycopg.rows import dict_row
+from psycopg import OperationalError,InterfaceError
 from psycopg_pool import ConnectionPool
 from .config import settings
 
@@ -38,15 +40,35 @@ def connection():
 def query(sql, params=(), one=False):
     if pool is None:
         raise RuntimeError('Database is not connected')
-    with connection() as conn:
-        cursor = conn.execute(sql, params)
-        if cursor.description:
-            return cursor.fetchone() if one else cursor.fetchall()
-        return None
+    retryable=sql.lstrip().upper().startswith(('SELECT','UPDATE','WITH UPDATED AS'))
+    for attempt in range(2):
+        try:
+            with pool.connection() as conn:
+                # Send namespace selection and the query in one network batch.
+                with conn.pipeline():
+                    conn.execute(f'SET LOCAL search_path TO {settings.database_schema},public')
+                    cursor=conn.execute(sql,params)
+                if cursor.description:
+                    return cursor.fetchone() if one else cursor.fetchall()
+                return None
+        except (OperationalError,InterfaceError):
+            if attempt or not retryable:
+                raise
+            time.sleep(.15)
 
 
 def event(kind, payload):
-    query('INSERT INTO events(kind,payload) VALUES(%s,%s::jsonb)', (kind, json.dumps(payload, default=str)))
+    source_id = payload.get('source_id') or (payload.get('id') if kind in ('source','frame') else None)
+    owner = None
+    if source_id:
+        owner = query('SELECT created_by FROM sources WHERE id=%s',(source_id,),one=True)
+    elif kind in ('job','incident') and payload.get('id'):
+        table = 'jobs' if kind=='job' else 'incidents'
+        owner = query(f'SELECT s.created_by FROM {table} r JOIN sources s ON s.id=r.source_id WHERE r.id=%s',(payload['id'],),one=True)
+    elif kind=='alert' and payload.get('incident_id'):
+        owner = query('SELECT s.created_by FROM incidents i JOIN sources s ON s.id=i.source_id WHERE i.id=%s',(payload['incident_id'],),one=True)
+    query('INSERT INTO events(kind,payload,owner_id) VALUES(%s,%s::jsonb,%s)',
+          (kind,json.dumps(payload,default=str),owner['created_by'] if owner else None))
 
 
 def close():
