@@ -2,7 +2,7 @@
 
 ## Railway backend
 
-1. Create a Railway project and backend service from `PraneethPW/YOLO` (branch `main`). Use `/backend` as its root directory and `/backend/railway.toml` as its configuration path. Build with the included Dockerfile.
+1. Create a Railway project and backend service from `PraneethPW/YOLO` (branch `main`). Use `/backend` as its root directory. Build with the included `Dockerfile`. Set the service health check to `/api/health`, its timeout to 120 seconds, one replica, and disable sleeping. These settings live in Railway's service configuration. Legacy `railway.toml` configuration is deprecated by Railway and is not included.
 2. Attach a **persistent volume mounted at `/data`** before processing footage. Neon stores records; the volume stores original videos, evidence images, and latest camera frames. Without the volume, deploys lose those files.
 3. Set server-only variables from `backend/.env.example`. Never put them in frontend build variables or GitHub source.
 4. Generate a public Railway domain. Health check: `/api/health`.

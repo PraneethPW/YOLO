@@ -1,0 +1,8 @@
+backend/
+.git/
+**/node_modules/
+**/dist/
+**/.env
+**/.env.*
+**/data/
+**/__pycache__/
