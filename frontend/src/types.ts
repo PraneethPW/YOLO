@@ -1,0 +1,9 @@
+export type User={id:string;name:string;email:string;role:'admin'|'operator'};
+export type Track={id:number;box:number[];class:string;confidence:number};
+export type Source={id:string;name:string;kind:'upload'|'webcam'|'stream';location:string;latitude:number|null;longitude:number|null;status:string;last_error:string|null;created_at:string;last_frame_at:string|null;tracks:Track[];fps:number};
+export type Job={id:string;source_id:string;source_name:string;original_name:string;status:string;progress:number;processed_frames:number;total_frames:number;error:string|null;created_at:string};
+export type Incident={id:string;source_id:string;source_name:string;source_kind:string;job_id:string|null;location:string;latitude:number|null;longitude:number|null;status:'review'|'confirmed'|'dismissed'|'resolved';score:number;signals:{track_ids:number[];overlap:number;supporting_frames:number;required_frames:number;window_seconds:number;motion:Record<string,unknown>[]};detected_at:string;video_seconds:number|null;notes:string;ai_summary:string|null;ai_model:string|null;ai_error:string|null};
+export type Stats={total:number;review:number;confirmed:number;last_day:number;sources:number;live:number;delivered:number;timeline:{day:string;count:number}[]};
+export type Target={id:string;name:string;enabled:boolean};
+export type Settings={ai_connected:boolean;ai_model:string;max_upload_mb:number;auto_alert_candidates:boolean;vision_model:string;database:string;targets:Target[];camera_allowed_hosts?:string;webhook_allowed_hosts?:string};
+export type Alert={id:string;incident_id:string;target_name:string;status:string;attempts:number;response_code:number|null;last_error:string|null;created_at:string};

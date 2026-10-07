@@ -1,0 +1,12 @@
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+psycopg[binary,pool]==3.2.9
+pydantic-settings==2.9.1
+python-multipart==0.0.20
+PyJWT==2.10.1
+argon2-cffi==23.1.0
+httpx==0.28.1
+ultralytics==8.3.153
+opencv-python-headless==4.11.0.86
+lap==0.5.12
+pytest==8.3.5

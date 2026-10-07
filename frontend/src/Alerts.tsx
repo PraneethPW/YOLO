@@ -1,0 +1,13 @@
+import {useState} from 'react';
+import {useQuery,useQueryClient} from '@tanstack/react-query';
+import {Bell,RefreshCw} from 'lucide-react';
+import {Link} from 'react-router-dom';
+import {api} from './api';
+import {useAuth} from './auth';
+import {Empty,ErrorMessage,Spinner,Status,date} from './ui';
+import type {Alert,Settings} from './types';
+export default function Alerts(){
+ const data=useQuery({queryKey:['alerts'],queryFn:()=>api<Alert[]>('/alerts'),refetchInterval:5000});const settings=useQuery({queryKey:['settings'],queryFn:()=>api<Settings>('/settings')});const {user}=useAuth();const query=useQueryClient();const [error,setError]=useState<unknown>();const [busy,setBusy]=useState('');
+ async function retry(id:string){setBusy(id);try{await api('/alerts/'+id+'/retry',{method:'POST'});query.invalidateQueries({queryKey:['alerts']});}catch(e){setError(e);}finally{setBusy('');}}
+ return <><div className="page-title"><div><span className="eyebrow">RESPONSE / DELIVERY LOG</span><h1>Alert deliveries<span className="title-dot">.</span></h1><p>See whether each configured destination accepted your incident alert.</p></div>{user?.role==='admin'&&<Link className="button outline" to="/app/settings">Manage destinations</Link>}</div><ErrorMessage error={error||data.error}/>{!settings.data?.targets.some(t=>t.enabled)&&<div className="info-banner"><Bell size={20}/><div><strong>No active response destinations</strong><p>Confirmed incidents will remain in your records. Add a destination in Settings to enable alert delivery.</p></div></div>}{data.isPending?<Spinner/>:!data.data?.length?<Empty icon={<Bell size={30}/>} title="No alert deliveries yet" text="When an operator confirms an incident, the server queues an alert for every enabled destination. This log records actual delivery attempts."/>:<div className="table-wrap"><table><thead><tr><th>Destination</th><th>Incident</th><th>Created</th><th>Attempts</th><th>Delivery</th><th>Action</th></tr></thead><tbody>{data.data.map(alert=><tr key={alert.id}><td><strong>{alert.target_name}</strong>{alert.last_error&&<small className="source-error">{alert.last_error}</small>}</td><td><code>{alert.incident_id.slice(0,8)}</code></td><td>{date(alert.created_at)}</td><td>{alert.attempts}{alert.response_code?` · HTTP ${alert.response_code}`:''}</td><td><Status value={alert.status}/></td><td>{alert.status==='failed'&&user?.role==='admin'&&<button className="button outline small" onClick={()=>retry(alert.id)} disabled={busy===alert.id}>{busy===alert.id?<Spinner/>:<RefreshCw size={15}/>}Retry</button>}</td></tr>)}</tbody></table></div>}</>;
+}
