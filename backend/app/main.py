@@ -208,8 +208,10 @@ def start_source(identity:UUID,user=Depends(current_user)):
 
 @app.post('/api/sources/{identity}/stop')
 def stop_source(identity:UUID,user=Depends(current_user)):
-    get_source(identity)
+    source=get_source(identity)
     worker.stop_stream(identity)
+    if source['kind']=='webcam':
+        detector.reset(str(identity))
     db.query("UPDATE sources SET status='idle' WHERE id=%s",(identity,))
     db.query("UPDATE jobs SET status='cancelled',finished_at=now() WHERE source_id=%s AND status IN ('queued','processing')",(identity,))
     audit(user,'source.stopped',identity)
