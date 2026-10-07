@@ -30,8 +30,8 @@ frame_locks = {}
 
 @asynccontextmanager
 async def lifespan(app):
-    if len(settings.jwt_secret)<32 or len(settings.bootstrap_token)<24:
-        raise RuntimeError('JWT_SECRET (32+ characters) and BOOTSTRAP_TOKEN (24+ characters) are required')
+    if len(settings.jwt_secret)<32:
+        raise RuntimeError('JWT_SECRET (32+ characters) is required')
     db.start()
     if settings.worker_enabled:
         worker.start()
@@ -80,7 +80,7 @@ class Login(BaseModel):
 class Register(Login):
     password: str = Field(min_length=12,max_length=128)
     name: str = Field(min_length=2,max_length=100)
-    token: str = Field(min_length=10,max_length=256)
+    token: str = Field(default='',max_length=256)
 
 
 @app.post('/api/auth/register')
@@ -92,10 +92,9 @@ def register(body:Register,request:Request,response:Response):
     with db.connection() as conn:
         conn.execute('SELECT pg_advisory_xact_lock(176421)')
         first = conn.execute('SELECT id FROM users LIMIT 1').fetchone() is None
-        if first:
-            if not secrets.compare_digest(body.token,settings.bootstrap_token):
-                raise HTTPException(403,'Invalid setup token')
-        else:
+        if not first:
+            if not body.token:
+                raise HTTPException(403,'Administrator setup is complete. Ask your administrator for an invitation.')
             invitation = conn.execute('SELECT * FROM invitations WHERE token_hash=%s AND used_at IS NULL AND expires_at>now() FOR UPDATE', (digest(body.token),)).fetchone()
             if not invitation:
                 raise HTTPException(403,'Invitation is invalid or has expired')

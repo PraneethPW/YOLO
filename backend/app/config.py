@@ -9,7 +9,6 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ''
     openrouter_model: str = 'openrouter/free'
     jwt_secret: str = ''
-    bootstrap_token: str = ''
     frontend_origins: str = 'http://localhost:5173'
     cookie_secure: bool = False
     data_dir: str = './data'

@@ -15,7 +15,6 @@ Required variables:
 | `OPENROUTER_API_KEY` | Your OpenRouter key |
 | `OPENROUTER_MODEL` | `openrouter/free` |
 | `JWT_SECRET` | At least 32 random characters |
-| `BOOTSTRAP_TOKEN` | A separate random token, at least 24 characters |
 | `COOKIE_SECURE` | `true` in production |
 | `FRONTEND_ORIGINS` | Your exact Vercel production origin, without a trailing slash |
 | `DATA_DIR` | `/data` |
@@ -41,7 +40,7 @@ The Content Security Policy permits connections to `*.up.railway.app`. If using 
 
 ## First access
 
-Open the production site and select **Start monitoring**. Create the administrator account using the backend's `BOOTSTRAP_TOKEN`. Choose your own password (12+ characters). The setup token can create only the first account. Subsequent operators require single-use invitations created in Settings.
+Open the production site and select **Start monitoring**. Create the administrator account with your name, email, and a password (12+ characters). No setup token is required. Only the first account becomes an administrator; concurrent requests cannot create additional administrators. Subsequent operators require single-use invitations created in Settings.
 
 Connect an uploaded-video source or webcam. Enter actual road/location details. Coordinates are optional, but maps need both latitude and longitude. Video files may be MP4, MOV, AVI, WebM, or MKV up to the configured limit.
 

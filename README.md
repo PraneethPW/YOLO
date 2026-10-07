@@ -6,7 +6,7 @@ The application never seeds example cameras, incidents, locations, metrics, or a
 
 ## Implemented workflows
 
-- Administrator bootstrap, password hashing, short-lived access tokens, rotating HttpOnly refresh cookies, operator invitations, and role checks.
+- One-time administrator setup, password hashing, short-lived access tokens, rotating HttpOnly refresh cookies, operator invitations, and role checks.
 - Video upload, a durable processing queue, job progress, cancellation, restart recovery, vehicle tracking, and annotated frames.
 - Browser-camera frame ingestion and allowlisted RTSP/HTTP CCTV monitoring.
 - Temporal verification based on abrupt movement and vehicle-box overlap across several frames. Candidate evidence includes supporting-frame counts, an image, source location, and video timestamp.
@@ -34,7 +34,7 @@ python -m venv .venv
 pip install torch==2.7.1 torchvision==0.22.1 --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
 cp .env.example .env
-# Set DATABASE_URL, OPENROUTER_API_KEY, JWT_SECRET, and BOOTSTRAP_TOKEN.
+# Set DATABASE_URL, OPENROUTER_API_KEY, and JWT_SECRET.
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
@@ -46,7 +46,7 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:5173`. The first account uses `BOOTSTRAP_TOKEN` from your local backend environment. After bootstrap, new accounts require an invitation from Settings. No preset password exists in the source.
+Open `http://localhost:5173`. Create the first administrator account with your name, email, and password. Once that account exists, new accounts require an invitation from Settings. No preset password exists in the source.
 
 The application uses a dedicated `accident_alert` database schema. `DATABASE_SCHEMA` can change it. Each transaction sets its search path to support Neon transaction pooling.
 
