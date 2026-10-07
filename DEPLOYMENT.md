@@ -46,6 +46,14 @@ For the shared staff workspace, select **Operator sign in**. Create the first ad
 
 The application starts with empty operational data. It does not invent live cameras, accident detections, geographic locations, or sent alerts.
 
+## Road network
+
+Open Road network in the workspace, or select Place on map from a source card or analysis view. Select the source, click its actual capture location on the map, enter its road/area label, and save. You can enter coordinates manually or drag the placement pin. Go to my area requests device location only to center the map; it does not assign device coordinates to footage automatically. No location is inferred from an uploaded file.
+
+Locations persist in Neon and source-change events update connected workspaces. Source markers use received-frame timestamps: live requires a frame within ten seconds, delayed means a camera session has no fresh frame, and idle means capture is stopped. The side panel displays the actual latest annotated frame, frame age, tracked-vehicle count, and links to its analysis view. Analysis and map links open separate tabs so browser-camera capture can continue while the map is open. Keep the capture tab open; remote CCTV capture runs on the backend. Active incident rings open evidence review; the Incidents filter provides a review queue. Resolved or dismissed decisions remove the active ring through live events. The map queries up to 500 active incidents and displays a plus sign when that cap is reached.
+
+Coordinates identify the source capture location, including its incident records. This is coverage and incident monitoring, not vehicle GPS tracking or a third-party public traffic feed. Sources without coordinates remain actionable in the source list and placement queue. Visitor sessions retain their privacy boundaries.
+
 ## Connect a responder
 
 The responder must supply an HTTPS webhook. Add its hostname to `WEBHOOK_ALLOWED_HOSTS`, then create the destination in Settings. Provide the same signing secret to your receiver.

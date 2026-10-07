@@ -210,6 +210,28 @@ def get_source(identity,user,include_archived=False):
     return row
 
 
+class SourceLocation(BaseModel):
+    location: str = Field(min_length=2,max_length=200)
+    latitude: float | None = Field(default=None,ge=-90,le=90)
+    longitude: float | None = Field(default=None,ge=-180,le=180)
+
+
+@app.patch('/api/sources/{identity}/location')
+def update_source_location(identity:UUID,body:SourceLocation,user=Depends(current_user)):
+    get_source(identity,user)
+    if (body.latitude is None)!=(body.longitude is None):
+        raise HTTPException(422,'Provide both latitude and longitude, or neither')
+    location=body.location.strip()
+    if len(location)<2:
+        raise HTTPException(422,'Enter the road or area where this footage was captured')
+    source=db.query(f'''UPDATE sources SET location=%s,latitude=%s,longitude=%s
+                       WHERE id=%s RETURNING {SOURCE_FIELDS}''',
+                       (location,body.latitude,body.longitude,identity),one=True)
+    audit(user,'source.location_updated',identity)
+    db.event('source',{'id':str(identity)})
+    return source
+
+
 @app.post('/api/sources/{identity}/start')
 def start_source(identity:UUID,user=Depends(current_user)):
     source = get_source(identity,user)
@@ -354,12 +376,13 @@ INCIDENT_SELECT = '''SELECT i.*,s.name AS source_name,s.location,s.latitude,s.lo
 
 
 @app.get('/api/incidents')
-def incidents(status:str|None=None,search:str='',limit:int=100,user=Depends(current_user)):
+def incidents(status:str|None=None,search:str='',limit:int=100,active_only:bool=False,user=Depends(current_user)):
     limit = max(1,min(limit,500))
     scope,params=source_scope(user)
     return db.query(INCIDENT_SELECT+f''' WHERE {scope} AND (%s::text IS NULL OR i.status=%s)
+                 AND (NOT %s OR i.status IN ('review','confirmed'))
                  AND (s.name ILIKE %s OR s.location ILIKE %s) ORDER BY i.detected_at DESC LIMIT %s''',
-                 (*params,status,status,f'%{search[:200]}%',f'%{search[:200]}%',limit))
+                 (*params,status,status,active_only,f'%{search[:200]}%',f'%{search[:200]}%',limit))
 
 
 def get_incident(identity,user):

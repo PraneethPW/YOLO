@@ -15,7 +15,7 @@ The application never seeds example cameras, incidents, locations, metrics, or a
 - Operator confirmation, dismissal, resolution, notes, original-video playback, and CSV export.
 - OpenRouter signal explanations using free models only. No footage or precise location is transmitted to the LLM.
 - Signed webhook alerts, persistent delivery attempts, retries, destination controls, and audit history.
-- Shared live event updates, source health, an OpenStreetMap location view, responsive layouts, and reduced-motion support.
+- Shared live event updates, source health, and an actionable road network: place existing sources on the map, see frame freshness and camera state, open live analysis, and review active incidents directly from map rings or the incident queue. Visitors see only their own coverage. Responsive layouts and reduced-motion support.
 - Cinematic image parallax, a scroll-responsive Three.js background, and motion transitions throughout the workspace.
 
 ## Detection scope
