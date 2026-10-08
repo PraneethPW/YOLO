@@ -130,6 +130,8 @@ def refresh(request:Request,response:Response):
     if not row:
         raise HTTPException(401,'Please sign in again')
     user = db.query('SELECT * FROM users WHERE id=%s',(row['user_id'],),one=True)
+    if not user or user['role']=='visitor':
+        raise HTTPException(401,'Sign in or register to access the video dashboard')
     return session(user,response)
 
 
@@ -149,12 +151,7 @@ def logout(request:Request,response:Response):
 
 @app.post('/api/auth/visitor')
 def visitor(request:Request,response:Response):
-    throttle(('visitor',request.client.host),30,60)
-    identity=uuid4()
-    user=db.query('''INSERT INTO users(id,email,name,password_hash,role,visitor_expires_at)
-                     VALUES(%s,%s,%s,%s,'visitor',now()+interval '2 hours') RETURNING *''',
-                     (identity,f'{identity}@visitor.invalid','Private session','!'),one=True)
-    return session(user,response)
+    raise HTTPException(401,'Sign in or register to access the video dashboard')
 
 
 SOURCE_FIELDS = 'id,name,kind,location,latitude,longitude,status,last_error,created_at,last_frame_at,tracks,fps,archived,is_shared'
@@ -174,7 +171,7 @@ def sources(user=Depends(current_user)):
 
 
 @app.get('/api/library/sources')
-def library_sources():
+def library_sources(user=Depends(current_user)):
     return db.query(f'''SELECT {SOURCE_FIELDS},false AS can_manage,(SELECT json_build_object(
        'id',j.id,'status',j.status,'replay_status',j.replay_status,'replay_error',j.replay_error)
        FROM jobs j WHERE j.source_id=s.id ORDER BY j.created_at DESC,j.id DESC LIMIT 1) AS recording
@@ -601,15 +598,11 @@ def job_video(identity:UUID,user=Depends(current_user)):
     return FileResponse(row['path'])
 
 
-def get_replay(identity,user=None):
+def get_replay(identity,user):
     job=db.query('SELECT source_id,status,replay_status FROM jobs WHERE id=%s',(identity,),one=True)
     if not job:
         raise HTTPException(404,'Recorded video was not found')
-    if user is None:
-        if not db.query("SELECT id FROM sources WHERE id=%s AND is_shared AND kind='upload' AND NOT archived",(job['source_id'],),one=True):
-            raise HTTPException(404,'Shared recording was not found')
-    else:
-        get_source(job['source_id'],user)
+    get_source(job['source_id'],user)
     if job['status']!='completed' or job['replay_status']!='ready':
         raise HTTPException(409,'Recorded playback is still being prepared')
     if not replay.replay_path(identity).is_file() or not replay.info_path(identity).is_file():
@@ -629,19 +622,19 @@ def recorded_replay_info(identity:UUID,user=Depends(current_user)):
 
 
 @app.get('/api/library/jobs/{identity}/replay')
-def shared_replay(identity:UUID):
-    get_replay(identity)
+def shared_replay(identity:UUID,user=Depends(current_user)):
+    get_replay(identity,user)
     return FileResponse(replay.replay_path(identity),media_type='video/mp4')
 
 
 @app.get('/api/library/jobs/{identity}/replay/info')
-def shared_replay_info(identity:UUID):
-    get_replay(identity)
+def shared_replay_info(identity:UUID,user=Depends(current_user)):
+    get_replay(identity,user)
     return FileResponse(replay.info_path(identity),media_type='application/json')
 
 
 @app.get('/api/library/sources/{identity}/snapshot')
-def shared_snapshot(identity:UUID):
+def shared_snapshot(identity:UUID,user=Depends(current_user)):
     if not db.query("SELECT id FROM sources WHERE id=%s AND is_shared AND kind='upload' AND NOT archived",(identity,),one=True):
         raise HTTPException(404,'Shared recording was not found')
     path=settings.media/f'{identity}-latest.jpg'

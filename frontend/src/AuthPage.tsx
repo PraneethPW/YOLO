@@ -6,6 +6,7 @@ import {useAuth} from './auth';
 import {Brand} from './Landing';
 import {ErrorMessage,Spinner} from './ui';
 import type {User} from './types';
+import './library.css';
 export default function AuthPage(){
  const {user,accept}=useAuth();const navigate=useNavigate();const location=useLocation();const register=location.pathname==='/register';const [error,setError]=useState<unknown>();const [busy,setBusy]=useState(false);
  useEffect(()=>setError(undefined),[register]);
@@ -16,6 +17,6 @@ export default function AuthPage(){
  {register&&<label>Full name<input name="name" required minLength={2} maxLength={100} autoComplete="name"/></label>}
  <label>Email address<input name="email" type="email" required autoComplete="username"/></label><label>Password<input name="password" type="password" required minLength={register?8:1} maxLength={128} autoComplete={register?'new-password':'current-password'}/>{register&&<small>At least 8 characters</small>}</label>
  <button className="button lime full" disabled={busy}>{busy?<Spinner/>:null}{register?'Create account':'Sign in'}</button></form>
- <Link className="text-button" to={register?'/login':'/register'} state={location.state}>{register?'Already have an account? Sign in':'New here? Register as new'}</Link><Link className="text-button auth-library-link" to="/videos">Watch shared videos without signing in</Link>
+ <Link className="text-button" to={register?'/login':'/register'} state={location.state}>{register?'Already have an account? Sign in':'New here? Register as new'}</Link>
  </div></section></main>;
 }

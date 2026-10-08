@@ -68,11 +68,13 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
         raise HTTPException(401, 'Session expired')
     if not user or (user.get('visitor_expires_at') and user['visitor_expires_at'] <= datetime.now(timezone.utc)):
         raise HTTPException(401, 'Session expired')
+    if user['role']=='visitor':
+        raise HTTPException(401, 'Sign in or register to access the video dashboard')
     return user
 
 
 def source_scope(user, alias='s'):
-    # Explicitly shared recordings are visible to everyone. Personal uploads stay private.
+    # Shared recordings are visible to registered accounts. Personal uploads stay private.
     return (f"({alias}.is_shared OR {alias}.created_by=%s OR "
             f"(%s IN ('admin','operator') AND EXISTS (SELECT 1 FROM users owner "
             f"WHERE owner.id={alias}.created_by AND owner.role IN ('admin','operator'))))",
