@@ -1,8 +1,8 @@
-export type User={id:string;name:string;email:string;role:'admin'|'operator'|'visitor'};
+export type User={id:string;name:string;email:string;role:'admin'|'operator'|'visitor'|'member'};
 export type LiveEvent={kind:string;data:Record<string,unknown>};
 export type FrameResult={tracks:Track[];processing_fps:number;processing_ms:number;candidates:number;processed_at:string;image:string;frame_width:number;frame_height:number};
 export type Track={id:number;box:number[];class:string;confidence:number};
-export type Source={id:string;name:string;kind:'upload'|'webcam'|'stream';location:string;latitude:number|null;longitude:number|null;status:string;last_error:string|null;created_at:string;last_frame_at:string|null;tracks:Track[];fps:number;recording?:{id:string;status:string;replay_status:'pending'|'building'|'ready'|'failed';replay_error:string|null}|null};
+export type Source={is_shared:boolean;can_manage:boolean;id:string;name:string;kind:'upload'|'webcam'|'stream';location:string;latitude:number|null;longitude:number|null;status:string;last_error:string|null;created_at:string;last_frame_at:string|null;tracks:Track[];fps:number;recording?:{id:string;status:string;replay_status:'pending'|'building'|'ready'|'failed';replay_error:string|null}|null};
 export type Job={id:string;source_id:string;source_name:string;original_name:string;status:string;progress:number;processed_frames:number;total_frames:number;error:string|null;created_at:string};
 export type Incident={id:string;source_id:string;source_name:string;source_kind:string;job_id:string|null;location:string;latitude:number|null;longitude:number|null;status:'review'|'confirmed'|'dismissed'|'resolved';score:number;signals:{track_ids:number[];overlap:number;supporting_frames:number;required_frames:number;window_seconds:number;motion:Record<string,unknown>[]};detected_at:string;video_seconds:number|null;notes:string;ai_summary:string|null;ai_model:string|null;ai_error:string|null};
 export type Stats={total:number;review:number;confirmed:number;last_day:number;sources:number;live:number;delivered:number;timeline:{day:string;count:number}[]};

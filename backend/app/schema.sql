@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS visitor_expires_at TIMESTAMPTZ;
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
-ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN ('admin','operator','visitor'));
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN ('admin','operator','visitor','member'));
 CREATE TABLE IF NOT EXISTS sessions (
  token_hash TEXT PRIMARY KEY, user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS jobs (
  error TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), finished_at TIMESTAMPTZ
 );
 ALTER TABLE sources ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
+ALTER TABLE sources ADD COLUMN IF NOT EXISTS is_shared BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS jobs_queue ON jobs(status,created_at);
 CREATE INDEX IF NOT EXISTS jobs_source_created ON jobs(source_id,created_at DESC,id DESC);
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS replay_status TEXT NOT NULL DEFAULT 'pending';
@@ -64,6 +65,7 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS events_created ON events(created_at);
 ALTER TABLE events ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES users(id);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS source_id UUID REFERENCES sources(id);
 
 CREATE TABLE IF NOT EXISTS analysis_buckets (
  source_id UUID NOT NULL REFERENCES sources(id), session_key TEXT NOT NULL,

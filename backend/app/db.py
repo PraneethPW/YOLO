@@ -61,14 +61,14 @@ def event(kind, payload):
     source_id = payload.get('source_id') or (payload.get('id') if kind in ('source','frame') else None)
     owner = None
     if source_id:
-        owner = query('SELECT created_by FROM sources WHERE id=%s',(source_id,),one=True)
+        owner = query('SELECT id AS source_id,created_by FROM sources WHERE id=%s',(source_id,),one=True)
     elif kind in ('job','incident') and payload.get('id'):
         table = 'jobs' if kind=='job' else 'incidents'
-        owner = query(f'SELECT s.created_by FROM {table} r JOIN sources s ON s.id=r.source_id WHERE r.id=%s',(payload['id'],),one=True)
+        owner = query(f'SELECT s.id AS source_id,s.created_by FROM {table} r JOIN sources s ON s.id=r.source_id WHERE r.id=%s',(payload['id'],),one=True)
     elif kind=='alert' and payload.get('incident_id'):
-        owner = query('SELECT s.created_by FROM incidents i JOIN sources s ON s.id=i.source_id WHERE i.id=%s',(payload['incident_id'],),one=True)
-    query('INSERT INTO events(kind,payload,owner_id) VALUES(%s,%s::jsonb,%s)',
-          (kind,json.dumps(payload,default=str),owner['created_by'] if owner else None))
+        owner = query('SELECT s.id AS source_id,s.created_by FROM incidents i JOIN sources s ON s.id=i.source_id WHERE i.id=%s',(payload['incident_id'],),one=True)
+    query('INSERT INTO events(kind,payload,owner_id,source_id) VALUES(%s,%s::jsonb,%s,%s)',
+          (kind,json.dumps(payload,default=str),owner['created_by'] if owner else None,owner['source_id'] if owner else None))
 
 
 def close():

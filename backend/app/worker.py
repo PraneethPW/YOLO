@@ -36,7 +36,7 @@ def enqueue_alerts(incident_id):
     db.query('''INSERT INTO alert_deliveries(id,incident_id,target_id)
                 SELECT gen_random_uuid(),%s,t.id FROM alert_targets t WHERE t.enabled
                 AND EXISTS (SELECT 1 FROM incidents i JOIN sources s ON s.id=i.source_id
-                            JOIN users u ON u.id=s.created_by WHERE i.id=%s AND u.role<>'visitor')
+                            JOIN users u ON u.id=s.created_by WHERE i.id=%s AND u.role IN ('admin','operator'))
                 ON CONFLICT(incident_id,target_id) DO NOTHING''', (incident_id,incident_id))
     db.event('alert', {'incident_id': str(incident_id)})
 
@@ -58,8 +58,8 @@ def process_frame(source_id, frame, timestamp, job_id=None, video_seconds=None):
         lease_expires_at=CASE WHEN kind='webcam' THEN now()+interval '60 seconds' ELSE NULL END
         WHERE id=%s RETURNING id,tracks,fps,last_frame_at,created_by
     ), published AS (
-        INSERT INTO events(kind,payload,owner_id)
-        SELECT 'frame',jsonb_build_object('id',id,'tracks',tracks,'fps',fps,'last_frame_at',last_frame_at),created_by
+        INSERT INTO events(kind,payload,owner_id,source_id)
+        SELECT 'frame',jsonb_build_object('id',id,'tracks',tracks,'fps',fps,'last_frame_at',last_frame_at),created_by,id
         FROM updated RETURNING id
     ), measured AS ("""+analytics.SAMPLE_CTE+""") SELECT last_frame_at FROM updated,published""",
         (json.dumps(tracks),fps,source_id)+analytics.sample_values(source_id,job_id,video_seconds,tracks,vision_ms,timestamp),one=True)

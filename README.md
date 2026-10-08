@@ -10,7 +10,7 @@ The application never seeds example cameras, incidents, locations, metrics, or a
 - Dedicated analysis views with annotated frames, tracked vehicles, received-frame age, actual camera roundtrip latency, job progress, cancellation, and retry from the stored video.
 - Persistent analysis graphs for each recording and live source: weighted vehicle presence and peak trends, observed vehicle types, vision timing, incident timeline, a time inspector linked to original playback, and measured-history CSV export. Live history retains 24 hours; recording history remains attached to its job. Older recordings can rebuild graphs from their saved original.
 - Genuine post-analysis feedback with opt-in public display, administrator moderation, and a landing-page testimonial section. No sample quotes or ratings are seeded.
-- One-time administrator setup, password hashing, short-lived access tokens, rotating HttpOnly refresh cookies, operator invitations, and role checks.
+- One-time administrator setup, password hashing, short-lived access tokens, rotating HttpOnly refresh cookies, open account registration, and role checks.
 - Video upload, a durable processing queue, job progress, cancellation, restart recovery, vehicle tracking, and annotated frames.
 - Browser-camera frame ingestion and allowlisted RTSP/HTTP CCTV monitoring.
 - Continuous recorded replay on source cards and video analysis views: full-motion H.264 playback loops automatically with actual YOLO vehicle boxes and synchronized recorded track counts. Pause/restart controls are available. Older completed videos prepare replay automatically from their saved original, behind new analysis jobs. Replay remains labeled as recorded footage, never generates duplicate incidents or alerts, and never inflates live-camera totals or analysis graphs. Offscreen/background replay is suspended to avoid unnecessary media use.
@@ -51,7 +51,7 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:5173`. Choose **Use my camera** or **Analyze a video** to start a private visitor session. For a shared operations workspace, open **Operator sign in** and create the first administrator account with your name, email, and password. Once that account exists, new accounts require an invitation from Settings. No preset password exists in the source.
+Open `http://localhost:5173`. **Sign in** is for existing accounts; **Register as new** creates a permanent account with a name, email, and password, without an invitation token. The first permanent account becomes the administrator; subsequent registrations are members with personal uploads and read access to explicitly shared recordings. A guest who registers in the same browser keeps their session footage. Shared dataset videos appear on the landing page and `/videos`, where their actual annotated recordings loop without sign-in. Personal uploads are private by default. Mark only authorized dataset sources as `is_shared=true`; shared media routes verify that flag and exclude archived sources. No preset password exists in the source.
 
 The application uses a dedicated `accident_alert` database schema. `DATABASE_SCHEMA` can change it. Each transaction sets its search path to support Neon transaction pooling.
 

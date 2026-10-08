@@ -72,10 +72,20 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bear
 
 
 def source_scope(user, alias='s'):
-    # Public sessions see only their own footage; staff workspaces exclude visitor footage.
-    return (f"EXISTS (SELECT 1 FROM users owner WHERE owner.id={alias}.created_by AND "
-            "((%s='visitor' AND owner.id=%s) OR (%s<>'visitor' AND owner.role<>'visitor')))",
-            (user['role'],user['id'],user['role']))
+    # Explicitly shared recordings are visible to everyone. Personal uploads stay private.
+    return (f"({alias}.is_shared OR {alias}.created_by=%s OR "
+            f"(%s IN ('admin','operator') AND EXISTS (SELECT 1 FROM users owner "
+            f"WHERE owner.id={alias}.created_by AND owner.role IN ('admin','operator'))))",
+            (user['id'],user['role']))
+
+
+def can_manage_source(source,user):
+    if source['created_by']==user['id'] or user['role']=='admin':
+        return True
+    if user['role']=='operator':
+        owner=db.query('SELECT role FROM users WHERE id=%s',(source['created_by'],),one=True)
+        return bool(owner and owner['role'] in ('admin','operator'))
+    return False
 
 
 def admin(user=Depends(current_user)):
