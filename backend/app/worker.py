@@ -10,7 +10,7 @@ from uuid import uuid4
 import cv2
 import httpx
 from psycopg import OperationalError, InterfaceError
-from . import db, analytics
+from . import db, analytics, replay
 from .config import settings
 from .detector import detector
 from .security import safe_url
@@ -83,6 +83,8 @@ def process_frame(source_id, frame, timestamp, job_id=None, video_seconds=None):
 def run_job(job):
     source_id = job['source_id']
     capture = None
+    writer = None
+    replay_error = None
     try:
         detector.reset(str(source_id))
         db.query('DELETE FROM analysis_buckets WHERE job_id=%s',(job['id'],))
@@ -94,9 +96,17 @@ def run_job(job):
         if fps <= 0 or fps > 240:
             fps = 25
         stride = max(1,int(fps/4))
+        db.query("UPDATE jobs SET replay_status='building',replay_error=NULL WHERE id=%s",(job['id'],))
+        try:
+            writer=replay.ReplayWriter(job['id'],int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                                       int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),fps)
+        except Exception:
+            replay_error='Recorded playback could not be prepared. Retry replay preparation.'
         db.query("UPDATE sources SET status='processing',last_error=NULL WHERE id=%s", (source_id,))
         db.query('UPDATE jobs SET total_frames=%s WHERE id=%s', (total,job['id']))
         index = 0
+        tracks=[]
+        vision_width=vision_height=1
         while not shutdown.is_set():
             current = db.query('SELECT status FROM jobs WHERE id=%s', (job['id'],),one=True)
             if current['status'] == 'cancelled':
@@ -108,16 +118,37 @@ def run_job(job):
                     raise ValueError('Video ended before its declared frame count. File may be damaged.')
                 break
             index += 1
+            if (index-1) % stride==0:
+                result=process_frame(source_id,frame,index/fps,job['id'],index/fps)
+                tracks=result['tracks']
+                vision_width,vision_height=result['frame_width'],result['frame_height']
+                if writer:
+                    writer.observe((index-1)/fps,tracks)
+            if writer:
+                try:
+                    writer.write(frame,tracks,vision_width,vision_height)
+                except Exception:
+                    writer.abort()
+                    writer=None
+                    replay_error='Recorded playback could not be prepared. Retry replay preparation.'
             if (index-1) % stride:
                 continue
-            process_frame(source_id,frame,index/fps,job['id'],index/fps)
             progress = min(0.999,index/max(1,total))
             db.query('UPDATE jobs SET progress=%s,processed_frames=%s WHERE id=%s', (progress,index,job['id']))
             db.event('job', {'id': str(job['id']), 'progress': progress})
         if shutdown.is_set():
             db.query("UPDATE jobs SET status='queued' WHERE id=%s AND status='processing'", (job['id'],))
+            db.query("UPDATE jobs SET replay_status='pending' WHERE id=%s",(job['id'],))
         else:
-            db.query("UPDATE jobs SET status='completed',progress=1,processed_frames=%s,finished_at=now() WHERE id=%s AND status='processing'", (index,job['id']))
+            completed=db.query("UPDATE jobs SET status='completed',progress=1,processed_frames=%s,finished_at=now() WHERE id=%s AND status='processing' RETURNING id", (index,job['id']),one=True)
+            if completed and writer:
+                try:
+                    writer.finish()
+                    db.query("UPDATE jobs SET replay_status='ready',replay_error=NULL WHERE id=%s",(job['id'],))
+                except Exception:
+                    replay_error='Recorded playback could not be prepared. Retry replay preparation.'
+            if replay_error or not completed:
+                db.query("UPDATE jobs SET replay_status='failed',replay_error=%s WHERE id=%s",(replay_error or 'Complete the video analysis to prepare recorded playback.',job['id']))
         db.query("UPDATE sources SET status='idle' WHERE id=%s", (source_id,))
     except Exception as exc:
         if isinstance(exc, (OperationalError, InterfaceError)):
@@ -128,8 +159,11 @@ def run_job(job):
             message = 'Video analysis stopped unexpectedly. Retry using your saved video.'
         log.error('Video processing failed: %s', type(exc).__name__)
         db.query("UPDATE jobs SET status='failed',error=%s,finished_at=now() WHERE id=%s", (message,job['id']))
+        db.query("UPDATE jobs SET replay_status='failed',replay_error=%s WHERE id=%s",('Complete or retry this video analysis before recorded playback.',job['id']))
         db.query("UPDATE sources SET status='error',last_error=%s WHERE id=%s", (message,source_id))
     finally:
+        if writer:
+            writer.abort()
         if capture:
             capture.release()
         detector.reset(str(source_id))
@@ -145,9 +179,83 @@ def video_worker():
                     conn.execute("UPDATE jobs SET status='processing' WHERE id=%s", (job['id'],))
             if job:
                 run_job(job)
+            else:
+                with db.connection() as conn:
+                    pending=conn.execute('''SELECT j.* FROM jobs j JOIN sources s ON s.id=j.source_id
+                       JOIN users u ON u.id=s.created_by WHERE j.status='completed' AND j.replay_status='pending'
+                       AND NOT s.archived AND (u.role<>'visitor' OR u.visitor_expires_at>now())
+                       ORDER BY (j.id=(SELECT newest.id FROM jobs newest WHERE newest.source_id=j.source_id
+                         ORDER BY newest.created_at DESC,newest.id DESC LIMIT 1)) DESC,j.created_at DESC
+                       FOR UPDATE OF j SKIP LOCKED LIMIT 1''').fetchone()
+                    if pending:
+                        conn.execute("UPDATE jobs SET replay_status='building',replay_error=NULL WHERE id=%s",(pending['id'],))
+                if pending:
+                    build_replay(pending)
         except Exception as exc:
             log.error('Worker unavailable: %s',type(exc).__name__)
             shutdown.wait(5)
+
+
+def build_replay(job):
+    """Upgrade older saved recordings without touching incidents or measured history."""
+    capture=None
+    writer=None
+    identity='replay:'+str(job['id'])
+    try:
+        detector.reset(identity)
+        capture=cv2.VideoCapture(job['path'])
+        if not capture.isOpened():
+            raise ValueError('Recording cannot be decoded')
+        fps=capture.get(cv2.CAP_PROP_FPS)
+        if fps<=0 or fps>240:
+            fps=25
+        total=int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        stride=max(1,int(fps/4))
+        writer=replay.ReplayWriter(job['id'],int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)),int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),fps)
+        tracks=[]
+        width=height=1
+        index=0
+        while not shutdown.is_set():
+            if index%stride==0:
+                enabled=db.query('''SELECT NOT s.archived AND (u.role<>'visitor' OR u.visitor_expires_at>now()) AS ok,
+                    EXISTS(SELECT 1 FROM jobs WHERE status='queued') AS waiting
+                    FROM sources s JOIN users u ON u.id=s.created_by WHERE s.id=%s''',(job['source_id'],),one=True)
+                if not enabled or not enabled['ok']:
+                    raise ValueError('Source is no longer active')
+                if enabled['waiting']:
+                    db.query("UPDATE jobs SET replay_status='pending' WHERE id=%s",(job['id'],))
+                    return
+            ok,frame=capture.read()
+            if not ok:
+                if total>0 and index<total*.95:
+                    raise ValueError('Recording ended prematurely')
+                break
+            seconds=index/fps
+            if index%stride==0:
+                height,width=frame.shape[:2]
+                vision=frame
+                if max(height,width)>1280:
+                    width,height=int(width*1280/max(height,width)),int(height*1280/max(height,width))
+                    vision=cv2.resize(frame,(width,height))
+                tracks,_,_=detector.analyze(identity,vision,seconds)
+                writer.observe(seconds,tracks)
+            writer.write(frame,tracks,width,height)
+            index+=1
+        if shutdown.is_set():
+            db.query("UPDATE jobs SET replay_status='pending' WHERE id=%s",(job['id'],))
+        else:
+            writer.finish()
+            db.query("UPDATE jobs SET replay_status='ready',replay_error=NULL WHERE id=%s",(job['id'],))
+    except Exception as exc:
+        log.error('Replay preparation failed: %s',type(exc).__name__)
+        db.query("UPDATE jobs SET replay_status='failed',replay_error=%s WHERE id=%s",('Recorded playback could not be prepared. Check the saved original, then retry replay preparation.',job['id']))
+    finally:
+        if writer:
+            writer.abort()
+        if capture:
+            capture.release()
+        detector.reset(identity)
+        db.event('job',{'id':str(job['id'])})
 
 
 def run_stream(source, stop):
@@ -249,6 +357,7 @@ def alert_worker():
 def start():
     shutdown.clear()
     db.query("UPDATE jobs SET status='queued' WHERE status='processing'")
+    db.query("UPDATE jobs SET replay_status='pending' WHERE replay_status='building'")
     db.query("UPDATE sources SET status='idle' WHERE status IN ('live','processing')")
     threading.Thread(target=video_worker,daemon=True).start()
     threading.Thread(target=alert_worker,daemon=True).start()

@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
-from . import db, worker, analytics
+from . import db, worker, analytics, replay
 from .config import settings
 from .detector import detector
 from .limits import BodyLimitMiddleware
@@ -171,7 +171,10 @@ SOURCE_FIELDS = 'id,name,kind,location,latitude,longitude,status,last_error,crea
 @app.get('/api/sources')
 def sources(user=Depends(current_user)):
     scope,params=source_scope(user)
-    return db.query(f'SELECT {SOURCE_FIELDS} FROM sources s WHERE NOT archived AND {scope} ORDER BY created_at DESC',params)
+    return db.query(f'''SELECT {SOURCE_FIELDS},(SELECT json_build_object('id',j.id,'status',j.status,
+       'replay_status',j.replay_status,'replay_error',j.replay_error) FROM jobs j WHERE j.source_id=s.id
+       ORDER BY j.created_at DESC,j.id DESC LIMIT 1) AS recording
+       FROM sources s WHERE NOT archived AND {scope} ORDER BY created_at DESC''',params)
 
 
 class SourceInput(BaseModel):
@@ -348,7 +351,7 @@ def jobs(source_id:UUID|None=None,offset:int=0,user=Depends(current_user)):
         get_source(source_id,user)
     scope,params=source_scope(user)
     return db.query(f'''SELECT j.id,j.source_id,j.original_name,j.status,j.progress,j.processed_frames,
-                       j.total_frames,j.error,j.created_at,j.finished_at,s.name AS source_name
+                       j.total_frames,j.error,j.created_at,j.finished_at,j.replay_status,j.replay_error,s.name AS source_name
                        FROM jobs j JOIN sources s ON s.id=j.source_id WHERE {scope}
                        AND (%s::uuid IS NULL OR s.id=%s) ORDER BY j.created_at DESC,j.id DESC LIMIT 100 OFFSET %s''',
                        (*params,source_id,source_id,max(0,offset)))
@@ -584,6 +587,51 @@ def job_video(identity:UUID,user=Depends(current_user)):
     if not row or not Path(row['path']).exists():
         raise HTTPException(404,'Source video is unavailable')
     return FileResponse(row['path'])
+
+
+def get_replay(identity,user):
+    job=db.query('SELECT source_id,status,replay_status FROM jobs WHERE id=%s',(identity,),one=True)
+    if not job:
+        raise HTTPException(404,'Recorded video was not found')
+    get_source(job['source_id'],user)
+    if job['status']!='completed' or job['replay_status']!='ready':
+        raise HTTPException(409,'Recorded playback is still being prepared')
+    if not replay.replay_path(identity).is_file() or not replay.info_path(identity).is_file():
+        raise HTTPException(404,'Recorded playback is unavailable. Retry replay preparation.')
+
+
+@app.get('/api/jobs/{identity}/replay')
+def recorded_replay(identity:UUID,user=Depends(current_user)):
+    get_replay(identity,user)
+    return FileResponse(replay.replay_path(identity),media_type='video/mp4')
+
+
+@app.get('/api/jobs/{identity}/replay/info')
+def recorded_replay_info(identity:UUID,user=Depends(current_user)):
+    get_replay(identity,user)
+    return FileResponse(replay.info_path(identity),media_type='application/json')
+
+
+@app.post('/api/jobs/{identity}/replay/retry')
+def retry_recorded_replay(identity:UUID,user=Depends(current_user)):
+    job=db.query('SELECT source_id,path FROM jobs WHERE id=%s',(identity,),one=True)
+    if not job:
+        raise HTTPException(404,'Recorded video was not found')
+    get_source(job['source_id'],user)
+    if not Path(job['path']).is_file():
+        raise HTTPException(404,'The saved original is unavailable. Upload it again.')
+    throttle(('replay',str(user['id'])),5,300)
+    with db.connection() as conn:
+        current=conn.execute('SELECT status,replay_status FROM jobs WHERE id=%s FOR UPDATE',(identity,)).fetchone()
+        if current['status']!='completed':
+            raise HTTPException(409,'Complete or retry the video analysis first')
+        if current['replay_status']=='building':
+            raise HTTPException(409,'Recorded playback is already being prepared')
+        if current['replay_status']=='ready' and replay.replay_path(identity).is_file() and replay.info_path(identity).is_file():
+            return {'ok':True}
+        conn.execute("UPDATE jobs SET replay_status='pending',replay_error=NULL WHERE id=%s",(identity,))
+    db.event('job',{'id':str(identity)})
+    return {'ok':True}
 
 
 @app.get('/api/stats')

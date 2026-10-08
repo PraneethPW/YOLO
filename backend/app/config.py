@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     data_dir: str = './data'
     yolo_model: str = 'yolo11n.pt'
+    ffmpeg_binary: str = 'ffmpeg'
     camera_allowed_hosts: str = ''
     webhook_allowed_hosts: str = ''
     max_upload_mb: int = 100

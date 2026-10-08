@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 ALTER TABLE sources ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS jobs_queue ON jobs(status,created_at);
+CREATE INDEX IF NOT EXISTS jobs_source_created ON jobs(source_id,created_at DESC,id DESC);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS replay_status TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS replay_error TEXT;
+CREATE INDEX IF NOT EXISTS replay_queue ON jobs(replay_status,created_at) WHERE status='completed';
 CREATE TABLE IF NOT EXISTS incidents (
  id UUID PRIMARY KEY, source_id UUID NOT NULL REFERENCES sources(id), job_id UUID REFERENCES jobs(id),
  status TEXT NOT NULL DEFAULT 'review' CHECK(status IN ('review','confirmed','dismissed','resolved')),

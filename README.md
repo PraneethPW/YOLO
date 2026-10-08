@@ -13,6 +13,7 @@ The application never seeds example cameras, incidents, locations, metrics, or a
 - One-time administrator setup, password hashing, short-lived access tokens, rotating HttpOnly refresh cookies, operator invitations, and role checks.
 - Video upload, a durable processing queue, job progress, cancellation, restart recovery, vehicle tracking, and annotated frames.
 - Browser-camera frame ingestion and allowlisted RTSP/HTTP CCTV monitoring.
+- Continuous recorded replay on source cards and video analysis views: full-motion H.264 playback loops automatically with actual YOLO vehicle boxes and synchronized recorded track counts. Pause/restart controls are available. Older completed videos prepare replay automatically from their saved original, behind new analysis jobs. Replay remains labeled as recorded footage, never generates duplicate incidents or alerts, and never inflates live-camera totals or analysis graphs. Offscreen/background replay is suspended to avoid unnecessary media use.
 - Temporal verification based on abrupt movement and vehicle-box overlap across several frames. Candidate evidence includes supporting-frame counts, an image, source location, and video timestamp.
 - Operator confirmation, dismissal, resolution, notes, original-video playback, and CSV export.
 - OpenRouter signal explanations using free models only. No footage or precise location is transmitted to the LLM.

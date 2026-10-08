@@ -16,7 +16,7 @@ export async function raw(path:string,init:RequestInit={},retry=true):Promise<Re
   const headers=new Headers(init.headers);if(token)headers.set('Authorization','Bearer '+token);
   if(init.body && !(init.body instanceof FormData) && !headers.has('Content-Type'))headers.set('Content-Type','application/json');
   let response:Response;
-  const base=/\/upload$|\/video$|\/frame$/.test(path)?await largeTransferBase():'';
+  const base=/\/upload$|\/video$|\/frame$|\/replay(?:\/info)?$/.test(path)?await largeTransferBase():'';
   try{response=await fetch(base+'/api'+path,{...init,headers,credentials:base?'omit':'include'});}catch{throw new Error('Unable to reach the monitoring server. Check your connection.');}
   if(response.status===401 && retry && !path.startsWith('/auth/')){try{await refresh();return raw(path,init,false);}catch{window.dispatchEvent(new Event('session-expired'));}}
   if(!response.ok){const data=await response.json().catch(()=>null);let detail=data?.detail;if(Array.isArray(detail))detail=detail.map((d:{msg:string})=>d.msg).join('. ');throw new Error(typeof detail==='string'?detail:`Request failed (${response.status})`);}
