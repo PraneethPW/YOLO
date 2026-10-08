@@ -20,7 +20,7 @@ function frameAge(value:string|null,now:number){
  const seconds=Math.max(0,Math.floor((now-Date.parse(value))/1000));
  return seconds<2?'Frame just received':seconds<60?`Last frame ${seconds}s ago`:seconds<3600?`Last frame ${Math.floor(seconds/60)}m ago`:`Last frame ${Math.floor(seconds/3600)}h ago`;
 }
-const colors:Record<string,string>={live:'#ff4057',delayed:'#e6a7b6',error:'#ff6d7a',processing:'#f35578',idle:'#907c82'};
+const colors:Record<string,string>={live:'#56def5',delayed:'#ffcb7a',error:'#ff809b',processing:'#a69aff',idle:'#8290aa'};
 const kindLabel={upload:'Recorded video',webcam:'Browser camera',stream:'CCTV stream'};
 
 export default function Coverage(){

@@ -1,0 +1,64 @@
+/* Midnight glass with violet and cyan light. Evidence keeps its original colors. */
+:root {
+ color-scheme:dark;
+ --text:#f4f7ff;
+ --muted:#9eacc9;
+ --line:#293752;
+ --surface:#111729;
+ --accent:#9685ff;
+ --cyan:#56def5;
+ --primary:#6354e9;
+ --lime:var(--accent);
+ --glow:rgba(130,110,255,.3);
+ accent-color:var(--accent);
+ scrollbar-color:#58659a #080d1b;
+}
+::selection{background:#5747b8;color:#fff}
+.workspace,.auth-page{background:radial-gradient(ellipse at 88% 0,#6944ed20,transparent 52%),radial-gradient(ellipse at 0 85%,#1cb9e810,transparent 50%),#080d1b}
+.sidebar{background:linear-gradient(170deg,#13182b,#0a1020 65%);border-right-color:#2b3550}
+.workspace-topbar,.mobile-header{background:#0b1022b8;backdrop-filter:blur(20px);border-color:#ffffff0c}
+.landing-scene>img,.auth-art>img{filter:saturate(.85) brightness(.78) contrast(1.08)}
+.scene-shade{background:linear-gradient(90deg,#060915ed,#0d123270 60%,#102c4038),linear-gradient(0deg,#060915,transparent 45%)}
+.landing-scene::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 72% 28%,#8067ff24,transparent 55%),radial-gradient(ellipse at 78% 72%,#37d9ff16,transparent 50%);pointer-events:none}
+.hero h1 span{color:#b7a7ff;background:linear-gradient(110deg,#9986ff 0%,#bfadff 28%,#edf9ff 44%,#6ae3ff 60%,#9685ff 100%);background-size:240% 100%;background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 0 50px #8973ff45;animation:modern-text-shimmer 10s ease-in-out infinite}
+.brand-mark{background:linear-gradient(145deg,#8e77ff,#4c60e8);color:#fff;box-shadow:0 0 25px #8164ff65,inset 0 1px 0 #fff6}
+.button.lime{position:relative;isolation:isolate;overflow:hidden;color:#fff;background:linear-gradient(125deg,#6650e5,#365ce0);border:1px solid #a293ff66;box-shadow:0 6px 25px #4c47df50,0 0 28px #7969ff38,inset 0 1px 0 #ffffff30}
+.button.lime:hover:not(:disabled){background:linear-gradient(125deg,#7458ef,#4066ea);box-shadow:0 8px 32px #5c52ff70,0 0 40px #3da9ef40,inset 0 1px 0 #ffffff45}
+.button.lime:not(:disabled)::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 30%,#ffffff32 48%,transparent 66%);transform:translateX(-130%);animation:modern-action-shimmer 6s ease-in-out infinite}
+.button.outline{background:linear-gradient(130deg,#ffffff06,#ffffff02);border-color:#566482;color:#e6edff;box-shadow:inset 0 1px 0 #ffffff0b}
+.button.outline:hover:not(:disabled),.nav-console:hover{border-color:#72c9ed;background-color:#1a2742;box-shadow:0 0 24px #4baadd24}
+.nav-console{border-color:#616e92;background:#10183060;backdrop-filter:blur(16px)}
+.text-button,.text-link{color:#b7aaff}
+.text-button:hover,.text-link:hover{color:#79e6ff;text-shadow:0 0 16px #5cdef54d}
+.sidebar nav a.active,.tabs>button.active,.network-filters button.active,.source-types button.selected{background:linear-gradient(105deg,#6c50de38,#3191bb16);border-color:#8a7bea;color:#d6cfff;box-shadow:inset 0 0 24px #866eff12,0 0 22px #7663f41a}
+.sidebar nav a.active svg{color:#83defc;filter:drop-shadow(0 0 6px #45caff55)}
+.sidebar nav a:hover{background:#8c75ff10}
+.story-grid article,.source-card,.stat-card,.settings-card,.first-source,.network-summary,.coverage-layout .coverage-card{background:linear-gradient(135deg,#182038e0,#0e1628f0);border-color:#344160;box-shadow:inset 0 1px 0 #ffffff0a,0 12px 40px #02061425}
+.story-grid article,.source-card,.stat-card,.settings-card,.first-source{transition:border-color .25s,box-shadow .25s}
+.story-grid article:hover,.source-card:hover,.stat-card:hover,.settings-card:hover,.coverage-layout .coverage-card:hover{border-color:#8b79de;box-shadow:0 0 32px #8065ff25,inset 0 1px 0 #ffffff12}
+.stat-card strong{color:#ecf1ff;text-shadow:0 0 28px #927bff38}
+.stat-card svg,.section-row svg{color:#91dffa}
+.first-source-icon,.auth-icon,.track-icon,.coverage-layout .coverage-empty-icon{background:linear-gradient(145deg,#5f43c43b,#2289ac22);border-color:#7964c9;color:#b1a0ff;box-shadow:inset 0 0 25px #9478ff18,0 0 32px #7e5aff30}
+.side-rule,.signal-bars i,.lime-dot,.live-state.active i{background:var(--cyan);box-shadow:0 0 16px #49d7ff75}
+.connection.online>span{background:var(--cyan);box-shadow:0 0 12px #49d7ff75}
+.status-live,.status-delivered,.status-connected,.status-configured,.status-completed,.status-enabled{color:#81e7fa;background:#102d3e;border-color:#246980}
+.status-processing,.status-queued{color:#d3c5ff;background:#282044;border-color:#675295}
+.status-review,.status-pending,.status-delayed{color:#ffd594;background:#32281c;border-color:#77603c}
+.status-confirmed,.status-failed,.status-error{color:#ffa0b5;background:#351c2c;border-color:#8d3c59}
+.status-resolved{color:#b7c5df;background:#1b263b;border-color:#405472}
+.network-source.selected{background:linear-gradient(110deg,#7356de24,#32acd014);box-shadow:inset 0 0 24px #7969e616}
+.coverage-layout .coverage-board{background:radial-gradient(ellipse at 20% 0,#7958ee16,transparent 65%),#0b1223}
+.coverage-layout .coverage-card.selected{border-color:#70cdea;box-shadow:0 0 28px #53bddc20,inset 0 1px 0 #ffffff12}
+.coverage-layout .coverage-kind{color:#e6efff;background:#101a30e8;border-color:#52618b;backdrop-filter:blur(12px)}
+.coverage-layout .coverage-review{color:#ffd594;background:#33271d;border-color:#7a613b}
+.coverage-layout .coverage-outcomes svg,.coverage-layout .coverage-side-empty svg{color:#79dff5}
+.coverage-layout .coverage-preview{background:#060915}
+.network-panel{background:linear-gradient(160deg,#141d33,#0d1528)}
+.toggle.on{background:linear-gradient(120deg,#7d65f4,#427be5);box-shadow:0 0 15px #7363e836}
+.search:focus-within,input:focus-visible,textarea:focus-visible,select:focus-visible{border-color:#9584fc;box-shadow:0 0 20px #7a66eb28}
+.modal{background:linear-gradient(145deg,#19213a,#0f172b);border-color:#4c5a80;box-shadow:0 30px 100px #0009,0 0 65px #7753ea28,inset 0 1px 0 #ffffff10}
+.error{color:#ffb1c3;background:#371d2e;border-color:#89415a}
+.title-dot{color:#9c8aff;text-shadow:0 0 18px #8874ff88}
+@keyframes modern-action-shimmer{0%,55%{transform:translateX(-130%)}85%,100%{transform:translateX(130%)}}
+@keyframes modern-text-shimmer{0%,100%{background-position:100% 50%}50%{background-position:0% 50%}}
+@media(prefers-reduced-motion:reduce){.hero h1 span,.button.lime::after{animation:none}.button.lime::after{display:none}.hero h1 span{background-position:30% 50%}.story-grid article,.source-card,.stat-card,.settings-card,.first-source{transition:none}}

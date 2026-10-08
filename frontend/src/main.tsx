@@ -6,6 +6,6 @@ import {MotionConfig} from 'framer-motion';
 import {AuthProvider} from './auth';
 import App from './App';
 import './style.css';
-import './blood-theme.css';
+import './modern-theme.css';
 const query=new QueryClient({defaultOptions:{queries:{retry:1,staleTime:2000,refetchOnWindowFocus:true}}});
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><QueryClientProvider client={query}><BrowserRouter><MotionConfig reducedMotion="user"><AuthProvider><App/></AuthProvider></MotionConfig></BrowserRouter></QueryClientProvider></React.StrictMode>);
