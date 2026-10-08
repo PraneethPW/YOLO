@@ -44,7 +44,8 @@ async def lifespan(app):
 app = FastAPI(title='Accident Alert API',version='1.0.0',lifespan=lifespan)
 app.add_middleware(CORSMiddleware,allow_origins=settings.frontend_origins.split(','),
                    allow_credentials=True,allow_methods=['GET','POST','PATCH'],
-                   allow_headers=['Authorization','Content-Type','Last-Event-ID'])
+                   allow_headers=['Authorization','Content-Type','Last-Event-ID','Range'],
+                   expose_headers=['Accept-Ranges','Content-Range'])
 app.add_middleware(BodyLimitMiddleware)
 
 
