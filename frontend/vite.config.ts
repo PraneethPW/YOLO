@@ -4,5 +4,5 @@ import tailwind from '@tailwindcss/vite';
 export default defineConfig({
  plugins:[react(),tailwind()],
  server:{port:5173,strictPort:true,proxy:{'/api':{target:process.env.API_PROXY_TARGET||'http://127.0.0.1:8000',changeOrigin:false}}},
- build:{rollupOptions:{output:{manualChunks:{three:['three','@react-three/fiber'],motion:['framer-motion'],map:['leaflet']}}}}
+ build:{rollupOptions:{output:{manualChunks:{three:['three','@react-three/fiber'],motion:['framer-motion']}}}}
 });
