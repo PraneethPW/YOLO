@@ -9,6 +9,6 @@ function Trajectories({progress}:{progress:MotionValue<number>}){
   return new THREE.TubeGeometry(curve,80,.006,6,false);
  }),[]);
  useFrame(({clock,pointer})=>{if(group.current){group.current.rotation.z=progress.get()*.22+Math.sin(clock.elapsedTime*.1)*.02;group.current.rotation.y=pointer.x*.08;group.current.position.y=-progress.get()*2;}});
- return <group ref={group}>{lines.map((geometry,i)=><mesh geometry={geometry} key={i}><meshBasicMaterial color={i%2?'#b4f35c':'#80dce6'} transparent opacity={.18}/></mesh>)}</group>;
+ return <group ref={group}>{lines.map((geometry,i)=><mesh geometry={geometry} key={i}><meshBasicMaterial color={i%2?'#ff4057':'#a51431'} transparent opacity={.18}/></mesh>)}</group>;
 }
 export default function Scene({progress}:{progress:MotionValue<number>}){return <Boundary><Canvas dpr={[1,1.5]} camera={{position:[0,0,10],fov:55}} gl={{alpha:true,antialias:false}}><Trajectories progress={progress}/></Canvas></Boundary>;}

@@ -13,7 +13,7 @@ import 'leaflet/dist/leaflet.css';
 type Placement={id:string;location:string;latitude:string;longitude:string};
 function health(s:Source,now:number){if(s.status==='error'||s.status==='processing')return s.status;if(s.status==='live')return s.last_frame_at&&now-Date.parse(s.last_frame_at)<10000?'live':'delayed';return 'idle';}
 function frameAge(value:string|null,now:number){if(!value)return 'No frames received';const seconds=Math.max(0,Math.floor((now-Date.parse(value))/1000));return seconds<2?'Frame just received':seconds<60?`Last frame ${seconds}s ago`:seconds<3600?`Last frame ${Math.floor(seconds/60)}m ago`:`Last frame ${Math.floor(seconds/3600)}h ago`;}
-const colors:Record<string,string>={live:'#b4f35c',delayed:'#ffbb6b',error:'#ff6b6b',processing:'#78c7fa',idle:'#8195a3'};
+const colors:Record<string,string>={live:'#ff4057',delayed:'#e6a7b6',error:'#ff6d7a',processing:'#f35578',idle:'#907c82'};
 
 export default function RoadNetwork(){
  const container=useRef<HTMLDivElement>(null);const map=useRef<L.Map|null>(null);const sourceMarkers=useRef(new Map<string,L.CircleMarker>());const incidentMarkers=useRef(new Map<string,L.CircleMarker>());const draftMarker=useRef<L.Marker|null>(null);const fitted=useRef(false);
@@ -36,7 +36,7 @@ export default function RoadNetwork(){
   const instance=map.current;if(!instance)return;const wanted=new Set<string>();
   for(const source of visible){if(source.latitude===null||source.longitude===null)continue;wanted.add(source.id);let marker=sourceMarkers.current.get(source.id);
    if(!marker){marker=L.circleMarker([source.latitude,source.longitude],{bubblingMouseEvents:false,fillOpacity:.9,weight:3}).addTo(instance);marker.on('click',()=>selectSource.current(source.id));sourceMarkers.current.set(source.id,marker);}
-   marker.setLatLng([source.latitude,source.longitude]);marker.setStyle({color:colors[health(source,now)],fillColor:health(source,now)==='live'?'#233812':'#14222d',radius:selectedId===source.id?12:8});
+   marker.setLatLng([source.latitude,source.longitude]);marker.setStyle({color:colors[health(source,now)],fillColor:health(source,now)==='live'?'#380a14':'#10070b',radius:selectedId===source.id?12:8});
    const text=document.createElement('span');text.textContent=source.name+' · '+health(source,now)+' · '+frameAge(source.last_frame_at,now);marker.unbindTooltip().bindTooltip(text);
   }
   for(const [id,marker] of sourceMarkers.current)if(!wanted.has(id)){marker.remove();sourceMarkers.current.delete(id);}
@@ -45,7 +45,7 @@ export default function RoadNetwork(){
    // One ring per source keeps incidents at the same camera location readable.
    if(incidentIds.has(incident.source_id))continue;incidentIds.add(incident.source_id);let marker=incidentMarkers.current.get(incident.source_id);
    if(!marker){marker=L.circleMarker([incident.latitude,incident.longitude],{radius:23,bubblingMouseEvents:false,weight:2,fillOpacity:.15}).addTo(instance);marker.on('click',()=>openIncident.current(incident.source_id));incidentMarkers.current.set(incident.source_id,marker);}
-   const group=active.filter(i=>i.source_id===incident.source_id);marker.setLatLng([incident.latitude,incident.longitude]);marker.setStyle({color:group.some(i=>i.status==='confirmed')?'#ff6b6b':'#ffbb6b'});const text=document.createElement('span');text.textContent=`${group.length} active incident${group.length===1?'':'s'} · Click to review`;marker.unbindTooltip().bindTooltip(text);marker.bringToBack();
+   const group=active.filter(i=>i.source_id===incident.source_id);marker.setLatLng([incident.latitude,incident.longitude]);marker.setStyle({color:group.some(i=>i.status==='confirmed')?'#ff6d7a':'#e6a7b6'});const text=document.createElement('span');text.textContent=`${group.length} active incident${group.length===1?'':'s'} · Click to review`;marker.unbindTooltip().bindTooltip(text);marker.bringToBack();
   }
   for(const [id,marker] of incidentMarkers.current)if(!incidentIds.has(id)){marker.remove();incidentMarkers.current.delete(id);}
   if(located.length&&!fitted.current){instance.fitBounds(L.latLngBounds(located.map(s=>[s.latitude!,s.longitude!])),{padding:[45,45],maxZoom:15});fitted.current=true;}
