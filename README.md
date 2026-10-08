@@ -8,6 +8,8 @@ The application never seeds example cameras, incidents, locations, metrics, or a
 
 - Private two-hour visitor sessions: open a camera or upload a real video directly, with isolated footage and records.
 - Dedicated analysis views with annotated frames, tracked vehicles, received-frame age, actual camera roundtrip latency, job progress, cancellation, and retry from the stored video.
+- Persistent analysis graphs for each recording and live source: weighted vehicle presence and peak trends, observed vehicle types, vision timing, incident timeline, a time inspector linked to original playback, and measured-history CSV export. Live history retains 24 hours; recording history remains attached to its job. Older recordings can rebuild graphs from their saved original.
+- Genuine post-analysis feedback with opt-in public display, administrator moderation, and a landing-page testimonial section. No sample quotes or ratings are seeded.
 - One-time administrator setup, password hashing, short-lived access tokens, rotating HttpOnly refresh cookies, operator invitations, and role checks.
 - Video upload, a durable processing queue, job progress, cancellation, restart recovery, vehicle tracking, and annotated frames.
 - Browser-camera frame ingestion and allowlisted RTSP/HTTP CCTV monitoring.
@@ -15,7 +17,7 @@ The application never seeds example cameras, incidents, locations, metrics, or a
 - Operator confirmation, dismissal, resolution, notes, original-video playback, and CSV export.
 - OpenRouter signal explanations using free models only. No footage or precise location is transmitted to the LLM.
 - Signed webhook alerts, persistent delivery attempts, retries, destination controls, and audit history.
-- Shared live event updates, source health, and an actionable road network: place existing sources on the map, see frame freshness and camera state, open live analysis, and review active incidents directly from map rings or the incident queue. Visitors see only their own coverage. Responsive layouts and reduced-motion support.
+- Shared live event updates, source health, and a coverage board using actual latest footage, frame freshness, camera state, location editing, and incident review. Visitors see only their own coverage. Responsive layouts and reduced-motion support.
 - Cinematic image parallax, a scroll-responsive Three.js background, and motion transitions throughout the workspace.
 
 ## Detection scope
@@ -71,4 +73,4 @@ Additional integration checks during development use a separate temporary Neon s
 
 The landing image is original AI-generated artwork, used only as atmospheric artwork. It never appears as camera footage or incident evidence. Its prompt is documented in [ASSETS.md](ASSETS.md).
 
-Ultralytics is distributed under AGPL-3.0 unless separately licensed. This project is AGPL-3.0, with the complete application source available. See [Ultralytics licensing](https://www.ultralytics.com/license). The map uses OpenStreetMap with visible attribution.
+Ultralytics is distributed under AGPL-3.0 unless separately licensed. This project is AGPL-3.0, with the complete application source available. See [Ultralytics licensing](https://www.ultralytics.com/license).

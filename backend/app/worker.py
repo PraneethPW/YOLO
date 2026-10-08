@@ -10,7 +10,7 @@ from uuid import uuid4
 import cv2
 import httpx
 from psycopg import OperationalError, InterfaceError
-from . import db
+from . import db, analytics
 from .config import settings
 from .detector import detector
 from .security import safe_url
@@ -48,7 +48,9 @@ def process_frame(source_id, frame, timestamp, job_id=None, video_seconds=None):
     height, width = frame.shape[:2]
     if max(height,width) > 1280:
         frame = cv2.resize(frame, (int(width*1280/max(height,width)), int(height*1280/max(height,width))))
+    vision_started=time.monotonic()
     tracks,candidates,annotated = detector.analyze(str(source_id), frame, timestamp)
+    vision_ms=(time.monotonic()-vision_started)*1000
     save_jpeg(f'{source_id}-latest.jpg', annotated)
     fps = round(1/max(0.001,time.monotonic()-started),2)
     updated = db.query("""WITH updated AS (
@@ -59,7 +61,8 @@ def process_frame(source_id, frame, timestamp, job_id=None, video_seconds=None):
         INSERT INTO events(kind,payload,owner_id)
         SELECT 'frame',jsonb_build_object('id',id,'tracks',tracks,'fps',fps,'last_frame_at',last_frame_at),created_by
         FROM updated RETURNING id
-    ) SELECT last_frame_at FROM updated,published""",(json.dumps(tracks),fps,source_id),one=True)
+    ), measured AS ("""+analytics.SAMPLE_CTE+""") SELECT last_frame_at FROM updated,published""",
+        (json.dumps(tracks),fps,source_id)+analytics.sample_values(source_id,job_id,video_seconds,tracks,vision_ms,timestamp),one=True)
     for candidate in candidates:
         if job_id and db.query('SELECT id FROM incidents WHERE job_id=%s AND video_seconds=%s',(job_id,video_seconds),one=True):
             continue
@@ -82,6 +85,7 @@ def run_job(job):
     capture = None
     try:
         detector.reset(str(source_id))
+        db.query('DELETE FROM analysis_buckets WHERE job_id=%s',(job['id'],))
         capture = cv2.VideoCapture(job['path'])
         if not capture.isOpened():
             raise ValueError('Video cannot be decoded. Upload an MP4, MOV, AVI, or WebM video.')
@@ -259,6 +263,7 @@ def lease_worker():
                 detector.reset(str(source['id']))
                 db.event('source',{'id':str(source['id'])})
             db.query("UPDATE jobs SET status='cancelled',finished_at=now() WHERE status IN ('queued','processing') AND source_id IN (SELECT s.id FROM sources s JOIN users u ON u.id=s.created_by WHERE u.role='visitor' AND u.visitor_expires_at<now())")
+            db.query('DELETE FROM analysis_buckets WHERE (source_id,session_key,bucket_index) IN (SELECT source_id,session_key,bucket_index FROM analysis_buckets WHERE job_id IS NULL AND observed_end<now()-interval \'24 hours\' LIMIT 1000)')
         except Exception as exc:
             log.error('Camera lease recovery failed: %s',type(exc).__name__)
 

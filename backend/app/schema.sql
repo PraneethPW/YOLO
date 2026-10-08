@@ -60,3 +60,23 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS events_created ON events(created_at);
 ALTER TABLE events ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES users(id);
+
+CREATE TABLE IF NOT EXISTS analysis_buckets (
+ source_id UUID NOT NULL REFERENCES sources(id), session_key TEXT NOT NULL,
+ job_id UUID REFERENCES jobs(id), bucket_index BIGINT NOT NULL,
+ observed_start TIMESTAMPTZ NOT NULL, observed_end TIMESTAMPTZ NOT NULL,
+ video_start DOUBLE PRECISION, video_end DOUBLE PRECISION,
+ samples INTEGER NOT NULL, vehicle_sum BIGINT NOT NULL, vehicle_peak INTEGER NOT NULL,
+ car_sum BIGINT NOT NULL, motorcycle_sum BIGINT NOT NULL, bus_sum BIGINT NOT NULL, truck_sum BIGINT NOT NULL,
+ vision_ms_sum DOUBLE PRECISION NOT NULL, last_stamp DOUBLE PRECISION NOT NULL,
+ PRIMARY KEY(source_id,session_key,bucket_index)
+);
+CREATE INDEX IF NOT EXISTS analysis_live_window ON analysis_buckets(observed_end) WHERE job_id IS NULL;
+CREATE INDEX IF NOT EXISTS analysis_video_job ON analysis_buckets(job_id) WHERE job_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS source_feedback (
+ id UUID PRIMARY KEY, source_id UUID NOT NULL REFERENCES sources(id), user_id UUID NOT NULL REFERENCES users(id),
+ display_name TEXT NOT NULL, rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5), quote TEXT NOT NULL,
+ publish_consent BOOLEAN NOT NULL DEFAULT false,
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','hidden')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT now(), UNIQUE(source_id,user_id)
+);

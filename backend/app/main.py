@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
-from . import db, worker
+from . import db, worker, analytics
 from .config import settings
 from .detector import detector
 from .limits import BodyLimitMiddleware
@@ -343,11 +343,15 @@ async def upload(identity:UUID,file:UploadFile=File(...),user=Depends(current_us
 
 
 @app.get('/api/jobs')
-def jobs(user=Depends(current_user)):
+def jobs(source_id:UUID|None=None,offset:int=0,user=Depends(current_user)):
+    if source_id:
+        get_source(source_id,user)
     scope,params=source_scope(user)
     return db.query(f'''SELECT j.id,j.source_id,j.original_name,j.status,j.progress,j.processed_frames,
                        j.total_frames,j.error,j.created_at,j.finished_at,s.name AS source_name
-                       FROM jobs j JOIN sources s ON s.id=j.source_id WHERE {scope} ORDER BY j.created_at DESC LIMIT 100''',params)
+                       FROM jobs j JOIN sources s ON s.id=j.source_id WHERE {scope}
+                       AND (%s::uuid IS NULL OR s.id=%s) ORDER BY j.created_at DESC,j.id DESC LIMIT 100 OFFSET %s''',
+                       (*params,source_id,source_id,max(0,offset)))
 
 
 @app.post('/api/jobs/{identity}/retry')
@@ -373,6 +377,104 @@ def retry_job(identity:UUID,user=Depends(current_user)):
 
 INCIDENT_SELECT = '''SELECT i.*,s.name AS source_name,s.location,s.latitude,s.longitude,s.kind AS source_kind
                       FROM incidents i JOIN sources s ON s.id=i.source_id'''
+
+
+@app.get('/api/sources/{identity}/analytics')
+def source_analytics(identity:UUID,job_id:UUID|None=None,window_minutes:int=60,user=Depends(current_user)):
+    source=get_source(identity,user)
+    minutes=max(15,min(window_minutes,1440))
+    recording=None
+    if source['kind']=='upload':
+        recording=db.query('SELECT id,original_name,status,created_at FROM jobs WHERE source_id=%s AND (%s::uuid IS NULL OR id=%s) ORDER BY created_at DESC LIMIT 1',
+                           (identity,job_id,job_id),one=True)
+        if job_id and not recording:
+            raise HTTPException(404,'Recording was not found for this source')
+        job_id=recording['id'] if recording else None
+    elif job_id:
+        raise HTTPException(422,'Live feeds use a time window rather than a recording')
+    data=analytics.read(identity,job_id,minutes)
+    events=db.query(INCIDENT_SELECT+''' WHERE i.source_id=%s AND
+       ((%s::uuid IS NOT NULL AND i.job_id=%s) OR (%s::uuid IS NULL AND i.job_id IS NULL
+        AND i.detected_at>=now()-(%s*interval '1 minute'))) ORDER BY i.detected_at DESC LIMIT 501''',
+       (identity,job_id,job_id,job_id,minutes))
+    return {**data,'recording':recording,'events':events[:500],'events_truncated':len(events)>500}
+
+
+@app.post('/api/jobs/{identity}/analytics/start')
+def build_recording_analytics(identity:UUID,user=Depends(current_user)):
+    row=db.query('SELECT * FROM jobs WHERE id=%s',(identity,),one=True)
+    if not row:
+        raise HTTPException(404,'Recording was not found')
+    get_source(row['source_id'],user)
+    if not Path(row['path']).is_file():
+        raise HTTPException(404,'The original recording is unavailable. Upload it again.')
+    throttle(('retry-video',str(user['id'])),3,300)
+    with db.connection() as conn:
+        conn.execute('SELECT id FROM sources WHERE id=%s FOR UPDATE',(row['source_id'],))
+        current=conn.execute('SELECT status FROM jobs WHERE id=%s FOR UPDATE',(identity,)).fetchone()
+        if current['status']!='completed':
+            raise HTTPException(409,'Complete or retry this recording first')
+        if conn.execute('SELECT 1 FROM analysis_buckets WHERE job_id=%s LIMIT 1',(identity,)).fetchone():
+            raise HTTPException(409,'This recording already has analysis history')
+        if conn.execute("SELECT id FROM jobs WHERE source_id=%s AND status IN ('queued','processing')",(row['source_id'],)).fetchone():
+            raise HTTPException(409,'This source already has an active analysis')
+        conn.execute("UPDATE jobs SET status='queued',progress=0,processed_frames=0,error=NULL,finished_at=NULL WHERE id=%s",(identity,))
+        conn.execute("UPDATE sources SET status='idle',last_error=NULL WHERE id=%s",(row['source_id'],))
+    db.event('job',{'id':str(identity)})
+    return {'ok':True}
+
+
+class SourceFeedback(BaseModel):
+    display_name:str=Field(min_length=2,max_length=80)
+    rating:int=Field(ge=1,le=5)
+    quote:str=Field(min_length=20,max_length=1000)
+    publish_consent:bool=False
+
+
+@app.post('/api/sources/{identity}/feedback')
+def submit_feedback(identity:UUID,payload:SourceFeedback,user=Depends(current_user)):
+    get_source(identity,user)
+    if not db.query('SELECT 1 FROM analysis_buckets WHERE source_id=%s LIMIT 1',(identity,),one=True):
+        raise HTTPException(409,'Analyze footage from this source before sharing feedback')
+    name,quote=payload.display_name.strip(),payload.quote.strip()
+    if len(name)<2 or len(quote)<20:
+        raise HTTPException(422,'Enter a name and at least 20 characters of feedback')
+    throttle(('source-feedback',str(user['id'])),10,3600)
+    db.query('''INSERT INTO source_feedback(id,source_id,user_id,display_name,rating,quote,publish_consent)
+       VALUES(%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(source_id,user_id) DO UPDATE SET
+       display_name=excluded.display_name,rating=excluded.rating,quote=excluded.quote,
+       publish_consent=excluded.publish_consent,status='pending',created_at=now()''',
+       (uuid4(),identity,user['id'],name,payload.rating,quote,payload.publish_consent))
+    return {'ok':True,'public':False}
+
+
+@app.get('/api/testimonials')
+def public_testimonials():
+    return db.query("SELECT id,display_name,rating,quote,created_at FROM source_feedback WHERE status='approved' AND publish_consent ORDER BY created_at DESC LIMIT 12")
+
+
+@app.get('/api/feedback')
+def feedback_queue(user=Depends(admin)):
+    return db.query('''SELECT f.id,f.display_name,f.rating,f.quote,f.publish_consent,f.status,f.created_at,
+       s.name AS source_name,s.kind AS source_kind FROM source_feedback f JOIN sources s ON s.id=f.source_id
+       ORDER BY f.created_at DESC LIMIT 100''')
+
+
+class FeedbackReview(BaseModel):
+    status:Literal['approved','hidden']
+
+
+@app.patch('/api/feedback/{identity}')
+def review_feedback(identity:UUID,payload:FeedbackReview,user=Depends(admin)):
+    with db.connection() as conn:
+        row=conn.execute('SELECT publish_consent FROM source_feedback WHERE id=%s FOR UPDATE',(identity,)).fetchone()
+        if not row:
+            raise HTTPException(404,'Feedback was not found')
+        if payload.status=='approved' and not row['publish_consent']:
+            raise HTTPException(409,'The author has not consented to public display')
+        conn.execute('UPDATE source_feedback SET status=%s WHERE id=%s',(payload.status,identity))
+    audit(user,'feedback.'+payload.status,identity)
+    return {'ok':True}
 
 
 @app.get('/api/incidents')
