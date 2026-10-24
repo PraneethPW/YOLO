@@ -1,0 +1,415 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Analyze a video \u00b7 Complete request lifecycle",
+    "subtitle": "Registered account \u2192 durable job \u2192 measured evidence \u2192 rendered UI \u00b7 ordering, not timing",
+    "output": "docs/upload-workflow.html",
+    "locale": "en",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/PraneethPW/YOLO.git",
+      "revision": "370128c5a54d6a3c4c940fba6b97e3adf0ee3059"
+    }
+  },
+  "participants": [
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "React UI",
+      "sublabel": "StartFlow / LiveSession",
+      "sources": [
+        {
+          "path": "frontend/src/StartFlow.tsx",
+          "line": 13,
+          "end_line": 24,
+          "label": "Create + upload"
+        },
+        {
+          "path": "frontend/src/api.ts",
+          "line": 15,
+          "end_line": 41,
+          "label": "Transport + SSE"
+        },
+        {
+          "path": "frontend/src/RecordedReplay.tsx",
+          "line": 18,
+          "end_line": 24,
+          "label": "Load replay + tracks"
+        }
+      ]
+    },
+    {
+      "id": "server",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "Auth + source scope",
+      "sources": [
+        {
+          "path": "backend/app/main.py",
+          "line": 190,
+          "end_line": 218,
+          "label": "Create + authorize source"
+        },
+        {
+          "path": "backend/app/main.py",
+          "line": 316,
+          "end_line": 352,
+          "label": "Upload + queue"
+        },
+        {
+          "path": "backend/app/main.py",
+          "line": 687,
+          "end_line": 708,
+          "label": "Event stream"
+        }
+      ]
+    },
+    {
+      "id": "data",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "Queue + evidence",
+      "sources": [
+        {
+          "path": "backend/app/schema.sql",
+          "line": 17,
+          "end_line": 46,
+          "label": "Source/job/incident FKs"
+        },
+        {
+          "path": "backend/app/schema.sql",
+          "line": 62,
+          "end_line": 81,
+          "label": "Events + measurements"
+        },
+        {
+          "path": "backend/app/db.py",
+          "line": 29,
+          "end_line": 57,
+          "label": "Transactions"
+        }
+      ]
+    },
+    {
+      "id": "vision",
+      "type": "backend",
+      "label": "Video thread",
+      "sublabel": "YOLO + temporal evidence",
+      "sources": [
+        {
+          "path": "backend/app/worker.py",
+          "line": 44,
+          "end_line": 80,
+          "label": "Frame writes"
+        },
+        {
+          "path": "backend/app/worker.py",
+          "line": 83,
+          "end_line": 170,
+          "label": "Process video"
+        },
+        {
+          "path": "backend/app/worker.py",
+          "line": 173,
+          "end_line": 193,
+          "label": "Claim queued work"
+        }
+      ]
+    },
+    {
+      "id": "files",
+      "type": "database",
+      "label": "Media files",
+      "sublabel": "Original + JPEG + replay",
+      "sources": [
+        {
+          "path": "backend/app/main.py",
+          "line": 328,
+          "end_line": 337,
+          "label": "Upload bytes"
+        },
+        {
+          "path": "backend/app/replay.py",
+          "line": 41,
+          "end_line": 76,
+          "label": "Replay encoding + publish"
+        },
+        {
+          "path": "backend/app/main.py",
+          "line": 601,
+          "end_line": 621,
+          "label": "Authorized replay retrieval"
+        }
+      ]
+    }
+  ],
+  "messages": [
+    {
+      "id": "create",
+      "from": "browser",
+      "to": "server",
+      "y": 170,
+      "label": "POST /api/sources",
+      "variant": "emphasis"
+    },
+    {
+      "id": "insert-source",
+      "from": "server",
+      "to": "data",
+      "y": 220,
+      "label": "INSERT sources (created_by = user.id)",
+      "variant": "security"
+    },
+    {
+      "id": "source-row",
+      "from": "data",
+      "to": "server",
+      "y": 265,
+      "label": "RETURNING source",
+      "variant": "return"
+    },
+    {
+      "id": "source-id",
+      "from": "server",
+      "to": "browser",
+      "y": 310,
+      "label": "201 \u00b7 source.id",
+      "variant": "return"
+    },
+    {
+      "id": "upload",
+      "from": "browser",
+      "to": "server",
+      "y": 370,
+      "label": "POST /api/sources/{identity}/upload",
+      "variant": "emphasis"
+    },
+    {
+      "id": "store-original",
+      "from": "server",
+      "to": "files",
+      "y": 420,
+      "label": "Write uploaded original video",
+      "variant": "default"
+    },
+    {
+      "id": "queue-job",
+      "from": "server",
+      "to": "data",
+      "y": 465,
+      "label": "INSERT jobs \u00b7 status='queued'",
+      "variant": "emphasis"
+    },
+    {
+      "id": "accepted",
+      "from": "server",
+      "to": "browser",
+      "y": 510,
+      "label": "202 \u00b7 job accepted",
+      "variant": "return"
+    },
+    {
+      "id": "claim",
+      "from": "vision",
+      "to": "data",
+      "y": 575,
+      "label": "Claim oldest queued job \u00b7 SKIP LOCKED",
+      "variant": "dashed"
+    },
+    {
+      "id": "job-row",
+      "from": "data",
+      "to": "vision",
+      "y": 620,
+      "label": "Job row \u00b7 status=processing",
+      "variant": "return"
+    },
+    {
+      "id": "decode",
+      "from": "vision",
+      "to": "files",
+      "y": 665,
+      "label": "Read original \u00b7 OpenCV decode",
+      "variant": "default"
+    },
+    {
+      "id": "save",
+      "from": "vision",
+      "to": "files",
+      "y": 720,
+      "label": "Write latest annotated JPEG",
+      "variant": "default"
+    },
+    {
+      "id": "measured",
+      "from": "vision",
+      "to": "data",
+      "y": 775,
+      "label": "UPDATE sources; INSERT events; UPSERT buckets",
+      "variant": "emphasis"
+    },
+    {
+      "id": "candidate",
+      "from": "vision",
+      "to": "data",
+      "y": 830,
+      "label": "If sustained evidence: INSERT incidents (review)",
+      "variant": "default"
+    },
+    {
+      "id": "encode-replay",
+      "from": "vision",
+      "to": "files",
+      "y": 885,
+      "label": "Write H.264 replay + measured track JSON"
+    },
+    {
+      "id": "complete",
+      "from": "vision",
+      "to": "data",
+      "y": 940,
+      "label": "UPDATE jobs \u00b7 completed / replay ready",
+      "variant": "default"
+    },
+    {
+      "id": "subscribe",
+      "from": "browser",
+      "to": "server",
+      "y": 1005,
+      "label": "GET /api/events?after={cursor}",
+      "variant": "emphasis"
+    },
+    {
+      "id": "event-read",
+      "from": "server",
+      "to": "data",
+      "y": 1050,
+      "label": "SELECT scoped events after cursor",
+      "variant": "default"
+    },
+    {
+      "id": "event-rows",
+      "from": "data",
+      "to": "server",
+      "y": 1095,
+      "label": "Event rows",
+      "variant": "return"
+    },
+    {
+      "id": "sse",
+      "from": "server",
+      "to": "browser",
+      "y": 1140,
+      "label": "SSE \u00b7 job / frame / incident",
+      "variant": "return"
+    },
+    {
+      "id": "refresh",
+      "from": "browser",
+      "to": "server",
+      "y": 1200,
+      "label": "GET /api/jobs + /api/sources + /api/incidents",
+      "variant": "emphasis"
+    },
+    {
+      "id": "read-state",
+      "from": "server",
+      "to": "data",
+      "y": 1245,
+      "label": "SELECT scoped state + source joins",
+      "variant": "default"
+    },
+    {
+      "id": "rows",
+      "from": "data",
+      "to": "server",
+      "y": 1290,
+      "label": "Persisted state",
+      "variant": "return"
+    },
+    {
+      "id": "render",
+      "from": "server",
+      "to": "browser",
+      "y": 1335,
+      "label": "200 JSON \u2192 React Query \u2192 UI",
+      "variant": "return"
+    },
+    {
+      "id": "load-replay",
+      "from": "browser",
+      "to": "server",
+      "y": 1395,
+      "label": "GET /api/jobs/{identity}/replay + /replay/info",
+      "variant": "default"
+    },
+    {
+      "id": "read-replay",
+      "from": "server",
+      "to": "files",
+      "y": 1440,
+      "label": "Authorized file read",
+      "variant": "default"
+    },
+    {
+      "id": "replay-result",
+      "from": "server",
+      "to": "browser",
+      "y": 1485,
+      "label": "MP4 + measured tracks \u2192 looping UI",
+      "variant": "return"
+    }
+  ],
+  "segments": [
+    {
+      "from": 155,
+      "to": 330,
+      "label": "01 / Create an owned source"
+    },
+    {
+      "from": 350,
+      "to": 535,
+      "label": "02 / Upload and acknowledge"
+    },
+    {
+      "from": 555,
+      "to": 965,
+      "label": "03 / Background processing"
+    },
+    {
+      "from": 985,
+      "to": 1360,
+      "label": "04 / Persisted events return to the UI"
+    },
+    {
+      "from": 1375,
+      "to": 1515,
+      "label": "05 / Completed playback"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Transport",
+      "items": [
+        "Source creation, state reads and SSE traverse the Vercel proxy in production. Upload and replay bypass the proxy using the public origin returned by /api/runtime. Bearer authorization is sent on both paths."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Ordering, not measured duration",
+      "items": [
+        "The SSE connection already exists while analysis runs; this timeline groups its consumption after worker writes for clarity. The worker repeats frame writes and progress events until completion. Replay is returned only once completed and ready."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Real failure branches",
+      "items": [
+        "Empty/oversized/unsupported uploads are rejected and partial uploads removed. Conflicting active jobs return 409. Cancelled/failed analyses may be retried from the original; process restart requeues interrupted work. A candidate is conditional, so a recording can finish without any incident."
+      ]
+    }
+  ]
+}

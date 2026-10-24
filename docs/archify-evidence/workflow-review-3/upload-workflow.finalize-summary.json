@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "sequence",
+  "quality": "showcase",
+  "specification": {
+    "path": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-source/upload-workflow.json",
+    "sha256": "faf13a3423b33fab3862758cee791b518312541020a8cdf21e80abc04518b0ab",
+    "bytes": 10008
+  },
+  "artifact": {
+    "path": "/Users/praneethreddy/Freelance Projects /YOLO/docs/upload-workflow.html",
+    "sha256": "17fb4060d9cf590b01bc1ec058071b0f7784c993ed254847aa882e0634b6864a",
+    "bytes": 833493
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-evidence/workflow-review-3/upload-workflow.finalize.json",
+    "summaryReceipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-evidence/workflow-review-3/upload-workflow.finalize-summary.json",
+    "browserCheckReceipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-evidence/workflow-review-3/upload-workflow.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-24T10:37:52.952Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 1768,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

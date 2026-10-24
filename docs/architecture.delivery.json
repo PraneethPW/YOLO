@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "a4e4849a-fcef-4d32-a001-779f4556aa41",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-source/architecture.json",
+  "output": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html",
+  "specification": {
+    "sha256": "bde7375fc845c47e97043ce07d51c4b036531939e07e630a372b81a7d1df71f5",
+    "bytes": 15101
+  },
+  "artifact": {
+    "sha256": "a6d63397771dd76adfc80cb288ec35af8d4ec376914da89dc50b9fcdb558afb0",
+    "bytes": 841252
+  }
+}

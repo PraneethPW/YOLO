@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-source/architecture.json",
+    "sha256": "bde7375fc845c47e97043ce07d51c4b036531939e07e630a372b81a7d1df71f5",
+    "bytes": 15101
+  },
+  "artifact": {
+    "path": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html",
+    "sha256": "a6d63397771dd76adfc80cb288ec35af8d4ec376914da89dc50b9fcdb558afb0",
+    "bytes": 841252
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-evidence/architecture-review-3/architecture.finalize.json",
+    "summaryReceipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-evidence/architecture-review-3/architecture.finalize-summary.json",
+    "browserCheckReceipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-evidence/architecture-review-3/architecture.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-24T10:37:52.952Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 1762,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

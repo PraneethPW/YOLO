@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-source/architecture.json",
+    "sha256": "f45d9412dd48ba5b2eec5d1209939236e2d4b7df9519f5399c4db77a3b5c9b5e",
+    "bytes": 15097
+  },
+  "artifact": {
+    "path": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html",
+    "sha256": "89b4b30f64f33420e7c82e09691658c525b677824365a8f58653fd664169c3cd",
+    "bytes": 841915
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "skipped"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "No supported browser found. Install Chrome/Chromium (or Microsoft Edge), or set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome/Chromium executable (or Microsoft Edge) and rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.finalize.json",
+    "summaryReceipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.finalize-summary.json",
+    "browserCheckReceipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 500,
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  }
+}

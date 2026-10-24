@@ -1,0 +1,502 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "architecture",
+  "quality": "showcase",
+  "startedAt": "2026-10-24T10:33:57.525Z",
+  "specification": {
+    "path": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-source/architecture.json",
+    "sha256": "f45d9412dd48ba5b2eec5d1209939236e2d4b7df9519f5399c4db77a3b5c9b5e",
+    "bytes": 15097
+  },
+  "artifact": {
+    "path": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html",
+    "sha256": "89b4b30f64f33420e7c82e09691658c525b677824365a8f58653fd664169c3cd",
+    "bytes": 841915
+  },
+  "stages": {
+    "validate": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": null,
+      "execution": "embedded-in-deliver",
+      "command": [
+        "/usr/local/bin/node",
+        "/Users/praneethreddy/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-source/architecture.json",
+        "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/Users/praneethreddy/Freelance Projects /YOLO",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": true,
+        "command": "validate",
+        "specification": {
+          "sha256": "f45d9412dd48ba5b2eec5d1209939236e2d4b7df9519f5399c4db77a3b5c9b5e",
+          "bytes": 15097
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        }
+      }
+    },
+    "deliver": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 307,
+      "command": [
+        "/usr/local/bin/node",
+        "/Users/praneethreddy/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-source/architecture.json",
+        "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/Users/praneethreddy/Freelance Projects /YOLO",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "receiptId": "ca749367-3402-4641-b93d-b4bd798f1515",
+        "ok": true,
+        "command": "deliver",
+        "type": "architecture",
+        "input": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-source/architecture.json",
+        "output": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html",
+        "specification": {
+          "sha256": "f45d9412dd48ba5b2eec5d1209939236e2d4b7df9519f5399c4db77a3b5c9b5e",
+          "bytes": 15097
+        },
+        "artifact": {
+          "sha256": "89b4b30f64f33420e7c82e09691658c525b677824365a8f58653fd664169c3cd",
+          "bytes": 841915
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "showcase",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 0
+        },
+        "evidence": {
+          "verified": true,
+          "repository": "https://github.com/PraneethPW/YOLO",
+          "revision": "370128c5a54d6a3c4c940fba6b97e3adf0ee3059",
+          "references": 23
+        },
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      }
+    },
+    "check": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 106,
+      "command": [
+        "/usr/local/bin/node",
+        "/Users/praneethreddy/.agents/skills/archify/bin/archify.mjs",
+        "check",
+        "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html",
+        "--require-provenance"
+      ],
+      "receipt": {
+        "ok": true,
+        "file": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html",
+        "artifact": {
+          "sha256": "89b4b30f64f33420e7c82e09691658c525b677824365a8f58653fd664169c3cd",
+          "bytes": 841915
+        },
+        "checks": [
+          {
+            "name": "single_svg",
+            "ok": true,
+            "details": [
+              "found 1 <svg> block(s)"
+            ]
+          },
+          {
+            "name": "finite_svg",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "orthogonal_arrows",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "label_route_clearance",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_crossings",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_corridors",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "container_border_runs",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "route_rhythm",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "legend_clearance",
+            "ok": true,
+            "details": []
+          }
+        ],
+        "composition": {
+          "schemaVersion": 1,
+          "profile": "showcase",
+          "status": "pass",
+          "summary": {
+            "errors": 0,
+            "warnings": 0
+          },
+          "metrics": {
+            "properCrossings": 0,
+            "resolvedCrossovers": 3,
+            "ambiguousCorridors": 0,
+            "arrowheadCollisions": 0,
+            "containerBorderRuns": 0,
+            "labelRouteClearanceIssues": 0,
+            "labelCanvasOverflowIssues": 0,
+            "minLabelRouteClearance": 5,
+            "desktopReadabilityIssues": 0,
+            "viewportHeightIssues": 0,
+            "minProjectedNodeTextPx": 6.9470967741935485,
+            "maxBends": 4,
+            "routesOverSuggestedBends": 4,
+            "maxStretch": 1.141,
+            "routesOverSuggestedStretch": 0,
+            "minSegmentPx": 24,
+            "minInteriorSegmentPx": 34,
+            "shortSegmentCount": 0,
+            "shortEndpointSegmentCount": 0,
+            "shortInteriorSegmentCount": 0,
+            "microSegmentCount": 0
+          },
+          "suggestedLimits": {
+            "bendsPerRelationship": 2,
+            "stretch": 1.35,
+            "segmentPx": 16,
+            "microSegmentPx": 8
+          },
+          "routeReview": {
+            "crossings": [
+              {
+                "left": {
+                  "id": "transport-request",
+                  "from": "transport",
+                  "to": "api",
+                  "label": "Bearer HTTP",
+                  "collectionIndex": 1,
+                  "artifactIndex": 2
+                },
+                "right": {
+                  "id": "explain-signals",
+                  "from": "api",
+                  "to": "ai",
+                  "label": "Explain signals",
+                  "collectionIndex": 7,
+                  "artifactIndex": 8
+                },
+                "point": [
+                  735,
+                  139.99999999999997
+                ],
+                "sharedNode": "api"
+              },
+              {
+                "left": {
+                  "id": "worker-state",
+                  "from": "worker",
+                  "to": "postgres",
+                  "label": "Claim / persist",
+                  "collectionIndex": 8,
+                  "artifactIndex": 9
+                },
+                "right": {
+                  "id": "api-files",
+                  "from": "api",
+                  "to": "media",
+                  "label": "Upload / serve",
+                  "collectionIndex": 10,
+                  "artifactIndex": 11
+                },
+                "point": [
+                  1141.2000000000003,
+                  346.52307692309125
+                ]
+              },
+              {
+                "left": {
+                  "id": "worker-files",
+                  "from": "worker",
+                  "to": "media",
+                  "label": "Read / write",
+                  "collectionIndex": 9,
+                  "artifactIndex": 10
+                },
+                "right": {
+                  "id": "delivery-state",
+                  "from": "alerts",
+                  "to": "postgres",
+                  "label": "Poll / update",
+                  "collectionIndex": 11,
+                  "artifactIndex": 12
+                },
+                "point": [
+                  1288,
+                  395
+                ]
+              }
+            ],
+            "detours": [
+              {
+                "relationship": {
+                  "id": "transport-request",
+                  "from": "transport",
+                  "to": "api",
+                  "label": "Bearer HTTP",
+                  "collectionIndex": 1,
+                  "artifactIndex": 2
+                },
+                "bends": 3,
+                "stretch": 1.141
+              },
+              {
+                "relationship": {
+                  "id": "worker-state",
+                  "from": "worker",
+                  "to": "postgres",
+                  "label": "Claim / persist",
+                  "collectionIndex": 8,
+                  "artifactIndex": 9
+                },
+                "bends": 4,
+                "stretch": 1
+              },
+              {
+                "relationship": {
+                  "id": "api-files",
+                  "from": "api",
+                  "to": "media",
+                  "label": "Upload / serve",
+                  "collectionIndex": 10,
+                  "artifactIndex": 11
+                },
+                "bends": 4,
+                "stretch": 1
+              },
+              {
+                "relationship": {
+                  "id": "delivery-state",
+                  "from": "alerts",
+                  "to": "postgres",
+                  "label": "Poll / update",
+                  "collectionIndex": 11,
+                  "artifactIndex": 12
+                },
+                "bends": 4,
+                "stretch": 1
+              }
+            ]
+          },
+          "leadingSpace": {
+            "measured": true,
+            "emptyTopPx": 40,
+            "emptyTopRatio": 0.049,
+            "occupiedTop": 40,
+            "viewBoxTop": 0,
+            "canvasHeight": 824,
+            "typicalNodeHeight": 76,
+            "reviewSuggested": false
+          },
+          "desktopReadability": {
+            "budgetBasis": "recognized-declared-wide",
+            "readerContract": "declared-wide-v1",
+            "availableDiagramWidth": 1346,
+            "actualBudgetPx": 1346,
+            "actualReaderWidth": 1376,
+            "desiredReaderWidth": 1483.125,
+            "viewportCap": 1376,
+            "limit": "viewport-cap",
+            "requestedTargetPx": 7.5,
+            "requestedTargetMet": false,
+            "hardFloorPx": 6,
+            "hardFloorMet": true,
+            "minimumOwner": {
+              "kind": "edge",
+              "id": "ui-request",
+              "from": "ui",
+              "to": "transport"
+            },
+            "minimumSourceTextPx": 8,
+            "minimumProjectedTextPx": 6.9470967741935485,
+            "semanticTextCount": 31
+          },
+          "issues": []
+        },
+        "provenance": "current",
+        "deliveryReceiptId": "ca749367-3402-4641-b93d-b4bd798f1515"
+      }
+    },
+    "browser-check": {
+      "status": "skipped",
+      "exitCode": 2,
+      "durationMs": 11,
+      "command": [
+        "/usr/local/bin/node",
+        "/Users/praneethreddy/.agents/skills/archify/bin/archify.mjs",
+        "browser-check",
+        "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html",
+        "--json",
+        "--require-provenance"
+      ],
+      "execution": "in-process",
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "browser-check",
+        "evidenceKind": "automated-browser",
+        "status": "skipped",
+        "visualReview": "not-requested",
+        "provenance": "current",
+        "deliveryReceiptId": "ca749367-3402-4641-b93d-b4bd798f1515",
+        "artifact": {
+          "path": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html",
+          "sha256": "89b4b30f64f33420e7c82e09691658c525b677824365a8f58653fd664169c3cd",
+          "bytes": 841915
+        },
+        "state": {
+          "detail": "read",
+          "motion": "still"
+        },
+        "chrome": {
+          "status": "unavailable",
+          "executable": null
+        },
+        "diagnostics": [
+          {
+            "code": "viewer/chrome-unavailable",
+            "severity": "warning",
+            "message": "No supported browser found. Install Chrome/Chromium (or Microsoft Edge), or set ARCHIFY_CHROME to its executable path.",
+            "subject": {
+              "artifact": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html"
+            },
+            "evidence": {
+              "executable": null
+            },
+            "supportedFixes": [
+              "set ARCHIFY_CHROME to a Chrome/Chromium executable (or Microsoft Edge) and rerun browser-check"
+            ]
+          }
+        ],
+        "containment": {
+          "status": "skipped",
+          "policy": "fit-or-reader-declared-readable-vertical-scroll",
+          "viewports": []
+        },
+        "themeStates": {
+          "status": "skipped",
+          "viewports": []
+        },
+        "readability": {
+          "status": "skipped",
+          "minimumProjectedNodeTextPx": 6,
+          "viewports": []
+        },
+        "viewerChrome": {
+          "status": "skipped",
+          "viewports": []
+        },
+        "captures": {
+          "status": "not-requested",
+          "screenshots": [],
+          "contactSheet": null
+        },
+        "sidecars": {
+          "receipt": "architecture.browser-check.json",
+          "files": []
+        },
+        "error": "No supported browser found. Install Chrome/Chromium (or Microsoft Edge), or set ARCHIFY_CHROME to its executable path."
+      }
+    }
+  },
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "No supported browser found. Install Chrome/Chromium (or Microsoft Edge), or set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome/Chromium executable (or Microsoft Edge) and rerun browser-check"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.finalize.json",
+    "summaryReceipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.finalize-summary.json",
+    "browserCheckReceipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "browser-check",
+  "finishedAt": "2026-10-24T10:33:58.025Z",
+  "durationMs": 500,
+  "update": {
+    "status": "unavailable",
+    "installedVersion": null,
+    "availableVersion": null,
+    "releaseNotes": null,
+    "checkedAt": null,
+    "source": null,
+    "noticeRequired": false,
+    "noticeText": null,
+    "reason": "cache-unavailable"
+  }
+}

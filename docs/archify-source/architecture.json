@@ -1,0 +1,509 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Accident Alert \u00b7 From footage to evidence",
+    "subtitle": "Verified source architecture \u00b7 React \u2192 FastAPI \u2192 PostgreSQL \u00b7 commit 370128c",
+    "output": "docs/architecture.html",
+    "locale": "en",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/PraneethPW/YOLO.git",
+      "revision": "370128c5a54d6a3c4c940fba6b97e3adf0ee3059"
+    },
+    "views": [
+      {
+        "id": "request",
+        "label": "01 \u00b7 Request & response",
+        "focus": [
+          "ui",
+          "transport",
+          "api",
+          "postgres"
+        ],
+        "note": "Bearer-authenticated requests; scoped SQL reads return JSON through the proxy."
+      },
+      {
+        "id": "analysis",
+        "label": "02 \u00b7 Analyze a recording",
+        "focus": [
+          "api",
+          "worker",
+          "postgres",
+          "media"
+        ],
+        "note": "202 queues a durable job; an in-process worker decodes, tracks, measures and persists evidence."
+      },
+      {
+        "id": "live",
+        "label": "03 \u00b7 Return to the UI",
+        "focus": [
+          "postgres",
+          "api",
+          "transport",
+          "ui"
+        ],
+        "note": "GET /api/events streams persisted events; React Query refreshes jobs, sources and incidents."
+      },
+      {
+        "id": "review",
+        "label": "04 \u00b7 Review & explain",
+        "focus": [
+          "ui",
+          "api",
+          "ai"
+        ],
+        "note": "An operator requests an optional explanation of measured signals, then reviews the footage."
+      },
+      {
+        "id": "delivery",
+        "label": "05 \u00b7 Conditional alerts",
+        "focus": [
+          "postgres",
+          "alerts",
+          "receiver"
+        ],
+        "note": "Staff confirmation queues enabled destinations; the worker signs HTTPS payloads and records results."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "React workspace",
+      "sublabel": "Monitor \u00b7 Map \u00b7 Review \u00b7 Analytics",
+      "pos": [
+        40,
+        220
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "frontend/src/App.tsx",
+          "line": 18,
+          "end_line": 26,
+          "label": "Routes + SSE cache updates"
+        },
+        {
+          "path": "frontend/src/StartFlow.tsx",
+          "line": 13,
+          "end_line": 24,
+          "label": "Create source + upload"
+        },
+        {
+          "path": "frontend/src/LiveSession.tsx",
+          "line": 12,
+          "end_line": 35,
+          "label": "Poll + render results"
+        }
+      ],
+      "tag": "React 19 / Vite"
+    },
+    {
+      "id": "transport",
+      "type": "frontend",
+      "label": "API transport",
+      "sublabel": "Same-origin proxy / direct media",
+      "pos": [
+        430,
+        220
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "frontend/src/api.ts",
+          "line": 4,
+          "end_line": 41,
+          "label": "Bearer, refresh, transfers, SSE"
+        },
+        {
+          "path": "frontend/api/proxy.ts",
+          "line": 5,
+          "end_line": 30,
+          "label": "Forward headers + stream response"
+        },
+        {
+          "path": "frontend/vercel.json",
+          "line": 2,
+          "end_line": 6,
+          "label": "Vercel API rewrites"
+        }
+      ],
+      "tag": "Production routing"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI application",
+      "sublabel": "Auth \u00b7 scoped routes \u00b7 fetch SSE",
+      "pos": [
+        850,
+        220
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/main.py",
+          "line": 316,
+          "end_line": 352,
+          "label": "Upload, storage + queued job"
+        },
+        {
+          "path": "backend/app/main.py",
+          "line": 687,
+          "end_line": 708,
+          "label": "Scoped event stream"
+        },
+        {
+          "path": "backend/app/security.py",
+          "line": 61,
+          "end_line": 95,
+          "label": "JWT + scope + role enforcement"
+        }
+      ],
+      "tag": "One runtime"
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "Neon / PostgreSQL",
+      "sublabel": "accident_alert \u00b7 psycopg pool",
+      "pos": [
+        1420,
+        440
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/db.py",
+          "line": 14,
+          "end_line": 57,
+          "label": "Pool + transactional search path"
+        },
+        {
+          "path": "backend/app/schema.sql",
+          "line": 1,
+          "end_line": 88,
+          "label": "Physical tables + foreign keys"
+        },
+        {
+          "path": "backend/app/main.py",
+          "line": 513,
+          "end_line": 532,
+          "label": "Review + conditional delivery"
+        }
+      ],
+      "tag": "Records + durable queue"
+    },
+    {
+      "id": "ai",
+      "type": "external",
+      "label": "OpenRouter",
+      "sublabel": "Optional free-model explanation",
+      "pos": [
+        850,
+        40
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/main.py",
+          "line": 535,
+          "end_line": 565,
+          "label": "Signal-only LLM request + save"
+        }
+      ],
+      "tag": "No footage or location"
+    },
+    {
+      "id": "worker",
+      "type": "backend",
+      "label": "Vision + video worker",
+      "sublabel": "OpenCV \u00b7 YOLO \u00b7 ByteTrack \u00b7 FFmpeg",
+      "pos": [
+        850,
+        660
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/worker.py",
+          "line": 44,
+          "end_line": 80,
+          "label": "Persist tracks, candidates, samples"
+        },
+        {
+          "path": "backend/app/worker.py",
+          "line": 83,
+          "end_line": 193,
+          "label": "Decode, replay + queue claiming"
+        },
+        {
+          "path": "backend/app/detector.py",
+          "line": 14,
+          "end_line": 38,
+          "label": "CPU inference + temporal verifier"
+        }
+      ],
+      "tag": "In-process threads"
+    },
+    {
+      "id": "media",
+      "type": "database",
+      "label": "Media filesystem",
+      "sublabel": "Originals \u00b7 JPEGs \u00b7 replay MP4/JSON",
+      "pos": [
+        1110,
+        440
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/main.py",
+          "line": 328,
+          "end_line": 345,
+          "label": "Write uploaded original"
+        },
+        {
+          "path": "backend/app/worker.py",
+          "line": 24,
+          "end_line": 32,
+          "label": "Atomic JPEG writes"
+        },
+        {
+          "path": "backend/app/replay.py",
+          "line": 41,
+          "end_line": 76,
+          "label": "FFmpeg + replay files"
+        }
+      ],
+      "tag": "DATA_DIR / deployment volume"
+    },
+    {
+      "id": "alerts",
+      "type": "backend",
+      "label": "Delivery worker",
+      "sublabel": "Pending attempts \u00b7 backoff \u00b7 audit",
+      "pos": [
+        1420,
+        800
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/worker.py",
+          "line": 313,
+          "end_line": 351,
+          "label": "Query, sign, send, persist result"
+        },
+        {
+          "path": "backend/app/worker.py",
+          "line": 357,
+          "end_line": 364,
+          "label": "Start in-process workers"
+        }
+      ],
+      "tag": "Up to 5 attempts"
+    },
+    {
+      "id": "receiver",
+      "type": "external",
+      "label": "Webhook receiver",
+      "sublabel": "Configured HTTPS destination",
+      "pos": [
+        1110,
+        800
+      ],
+      "size": [
+        190,
+        76
+      ],
+      "sources": [
+        {
+          "path": "backend/app/worker.py",
+          "line": 329,
+          "end_line": 350,
+          "label": "HMAC + idempotency + 2xx result"
+        },
+        {
+          "path": "backend/app/main.py",
+          "line": 731,
+          "end_line": 737,
+          "label": "Admin + allowlist destination"
+        }
+      ],
+      "tag": "Only enabled targets"
+    }
+  ],
+  "connections": [
+    {
+      "id": "ui-request",
+      "to": "transport",
+      "label": "API calls",
+      "variant": "emphasis",
+      "from": "ui"
+    },
+    {
+      "id": "transport-request",
+      "to": "api",
+      "label": "Bearer HTTP",
+      "variant": "emphasis",
+      "from": "transport"
+    },
+    {
+      "id": "sql-request",
+      "to": "postgres",
+      "label": "Scoped SQL",
+      "variant": "emphasis",
+      "from": "api"
+    },
+    {
+      "id": "sql-response",
+      "to": "api",
+      "label": "Rows",
+      "variant": "default",
+      "from": "postgres"
+    },
+    {
+      "id": "api-response",
+      "to": "transport",
+      "label": "JSON / SSE",
+      "variant": "default",
+      "from": "api"
+    },
+    {
+      "id": "ui-response",
+      "to": "ui",
+      "label": "Query updates",
+      "variant": "default",
+      "from": "transport"
+    },
+    {
+      "id": "start-workers",
+      "to": "worker",
+      "label": "lifespan start",
+      "variant": "default",
+      "from": "api"
+    },
+    {
+      "id": "explain-signals",
+      "to": "ai",
+      "label": "Explain signals",
+      "variant": "default",
+      "from": "api"
+    },
+    {
+      "id": "worker-state",
+      "to": "postgres",
+      "label": "Claim / persist",
+      "variant": "default",
+      "from": "worker"
+    },
+    {
+      "id": "worker-files",
+      "to": "media",
+      "label": "Read / write",
+      "variant": "default",
+      "from": "worker"
+    },
+    {
+      "id": "api-files",
+      "to": "media",
+      "label": "Upload / serve",
+      "variant": "default",
+      "from": "api"
+    },
+    {
+      "id": "delivery-state",
+      "to": "postgres",
+      "label": "Poll / update",
+      "variant": "default",
+      "from": "alerts"
+    },
+    {
+      "id": "signed-delivery",
+      "to": "receiver",
+      "label": "Signed HTTPS",
+      "variant": "default",
+      "from": "alerts"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "01 / One real workflow",
+      "items": [
+        "Registered user selects Analyze a video: POST /api/sources creates a private source; POST /api/sources/{identity}/upload stores the original and returns 202 with a queued job.",
+        "The video thread claims jobs using FOR UPDATE SKIP LOCKED, decodes every frame, and samples inference at approximately 4 frames per second of source time.",
+        "process_frame writes current tracks, an event and 5-second analysis buckets; sustained heuristic evidence creates review incidents and JPEG snapshots.",
+        "GET /api/events \u2192 proxy \u2192 fetch SSE updates React Query; GET /api/jobs, /api/sources and /api/incidents refresh visible progress and evidence. Completed replay and analytics return to the analysis view."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "02 / Transport & processing",
+      "items": [
+        "Production: ordinary /api requests use frontend/api/proxy.ts. /api/runtime supplies the backend origin for direct upload, frame, original-video and replay transfers. Local Vite proxies /api to port 8000.",
+        "POST /api/sources/{identity}/frame processes browser JPEGs synchronously in a threadpool and returns tracks plus an annotated data-URL image. The browser waits for each result (at most 2 samples/second).",
+        "Admin-started allowlisted RTSP/HTTP cameras use a stream thread and the same process_frame function. All worker threads live in the API process; PostgreSQL is the durable queue.",
+        "GET /api/events polls persisted event rows every 0.6 seconds, sends heartbeats and reconnects after a bounded stream. Polling in the UI also refreshes jobs and source history."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "03 / Database relationships",
+      "items": [
+        "users.id \u2190 sessions.user_id, invitations.created_by, sources.created_by, incidents.reviewed_by, audit_log.actor_id, events.owner_id and source_feedback.user_id.",
+        "sources.id \u2190 jobs.source_id, incidents.source_id, events.source_id, analysis_buckets.source_id and source_feedback.source_id. jobs.id \u2190 incidents.job_id and analysis_buckets.job_id (both optional).",
+        "incidents.id \u2190 alert_deliveries.incident_id; alert_targets.id \u2190 alert_deliveries.target_id. UNIQUE(incident_id,target_id) prevents duplicate destination records.",
+        "analysis_buckets PK: (source_id,session_key,bucket_index). source_feedback UNIQUE(source_id,user_id). Media bytes are files; jobs.path and incidents.snapshot_path are stored references."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "04 / Gates that change behavior",
+      "items": [
+        "JWT access tokens last 15 minutes; rotating HttpOnly refresh cookies are backed by hashed sessions. Scope permits owned sources, explicitly shared recordings and the staff workspace. Visitors are rejected by current_user.",
+        "POST /api/incidents/{identity}/explain sends status, score, signals, source_kind and video_seconds to OpenRouter; API key and a permitted free model are required. The API saves the returned summary.",
+        "PATCH /api/incidents/{identity}: review \u2192 confirmed or dismissed; confirmed \u2192 resolved. Source management permission is required. Only admin/operator confirmation queues enabled alert targets.",
+        "AUTO_ALERT_CANDIDATES defaults to false. When explicitly enabled, candidate alerts still require a staff-owned source. Delivery uses HMAC SHA-256 and a stable Idempotency-Key; 2xx records receiver acceptance."
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "05 / Scope & reading guide",
+      "items": [
+        "This is a source-backed runtime map, not verification of a running cloud deployment. Vercel/Railway are configured hosting targets; DATA_DIR is a local directory unless a persistent volume is attached.",
+        "Vision produces vehicle tracks and heuristic motion/overlap evidence, not a calibrated crash probability. OpenRouter is an optional explanation service.",
+        "Landing, registration, source coverage, analytics, shared replay, feedback moderation, settings, exports and audit routes are inventoried in docs/api-reference.md. The full upload timeline is docs/upload-workflow.html.",
+        "Select a node for pinned source links; use the guided views, route probe, Live motion and Presentation Stage for the reel. Arrow direction expresses a call, data movement or startup relationship, as labeled."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-source/architecture.json",
+    "sha256": "f45d9412dd48ba5b2eec5d1209939236e2d4b7df9519f5399c4db77a3b5c9b5e",
+    "bytes": 15097
+  },
+  "artifact": {
+    "path": "/Users/praneethreddy/Freelance Projects /YOLO/docs/architecture.html",
+    "sha256": "89b4b30f64f33420e7c82e09691658c525b677824365a8f58653fd664169c3cd",
+    "bytes": 841915
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-evidence/architecture-review-2/architecture.finalize.json",
+    "summaryReceipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-evidence/architecture-review-2/architecture.finalize-summary.json",
+    "browserCheckReceipt": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-evidence/architecture-review-2/architecture.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-24T10:37:52.952Z",
+    "source": "network",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 2007,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  },
+  "visualReviewRecommendation": {
+    "action": "inspect-route-readability",
+    "signals": {
+      "resolvedCrossovers": 3,
+      "routesOverSuggestedBends": 4
+    },
+    "reason": "Automated gates passed, but crossings or detours still need perceptual review before claiming visual quality.",
+    "affectedRoutes": {
+      "crossings": [
+        {
+          "left": {
+            "id": "transport-request",
+            "from": "transport",
+            "to": "api",
+            "label": "Bearer HTTP",
+            "collectionIndex": 1,
+            "artifactIndex": 2
+          },
+          "right": {
+            "id": "explain-signals",
+            "from": "api",
+            "to": "ai",
+            "label": "Explain signals",
+            "collectionIndex": 7,
+            "artifactIndex": 8
+          },
+          "point": [
+            735,
+            139.99999999999997
+          ],
+          "sharedNode": "api"
+        },
+        {
+          "left": {
+            "id": "worker-state",
+            "from": "worker",
+            "to": "postgres",
+            "label": "Claim / persist",
+            "collectionIndex": 8,
+            "artifactIndex": 9
+          },
+          "right": {
+            "id": "api-files",
+            "from": "api",
+            "to": "media",
+            "label": "Upload / serve",
+            "collectionIndex": 10,
+            "artifactIndex": 11
+          },
+          "point": [
+            1141.2000000000003,
+            346.52307692309125
+          ]
+        },
+        {
+          "left": {
+            "id": "worker-files",
+            "from": "worker",
+            "to": "media",
+            "label": "Read / write",
+            "collectionIndex": 9,
+            "artifactIndex": 10
+          },
+          "right": {
+            "id": "delivery-state",
+            "from": "alerts",
+            "to": "postgres",
+            "label": "Poll / update",
+            "collectionIndex": 11,
+            "artifactIndex": 12
+          },
+          "point": [
+            1288,
+            395
+          ]
+        }
+      ],
+      "detours": [
+        {
+          "relationship": {
+            "id": "transport-request",
+            "from": "transport",
+            "to": "api",
+            "label": "Bearer HTTP",
+            "collectionIndex": 1,
+            "artifactIndex": 2
+          },
+          "bends": 3,
+          "stretch": 1.141
+        },
+        {
+          "relationship": {
+            "id": "worker-state",
+            "from": "worker",
+            "to": "postgres",
+            "label": "Claim / persist",
+            "collectionIndex": 8,
+            "artifactIndex": 9
+          },
+          "bends": 4,
+          "stretch": 1
+        },
+        {
+          "relationship": {
+            "id": "api-files",
+            "from": "api",
+            "to": "media",
+            "label": "Upload / serve",
+            "collectionIndex": 10,
+            "artifactIndex": 11
+          },
+          "bends": 4,
+          "stretch": 1
+        },
+        {
+          "relationship": {
+            "id": "delivery-state",
+            "from": "alerts",
+            "to": "postgres",
+            "label": "Poll / update",
+            "collectionIndex": 11,
+            "artifactIndex": 12
+          },
+          "bends": 4,
+          "stretch": 1
+        }
+      ],
+      "truncated": false
+    },
+    "hints": [
+      "transport → api and api → ai cross next to api: move node transport or ai so the two reach api from different sides (for example one level with it, one directly above or below it).",
+      "worker → postgres crosses api → media: move the node of whichever is a branch, return, or second entrance to the other side of the main path, so that relationship runs through an empty corridor.",
+      "worker → media crosses alerts → postgres: move the node of whichever is a branch, return, or second entrance to the other side of the main path, so that relationship runs through an empty corridor.",
+      "transport → api needs 3 bends: move node transport or api so they share a row or column with matching centers, or sit diagonally with a clear corner.",
+      "worker → postgres needs 4 bends: move node worker or postgres so they share a row or column with matching centers, or sit diagonally with a clear corner.",
+      "api → media needs 4 bends: move node api or media so they share a row or column with matching centers, or sit diagonally with a clear corner.",
+      "alerts → postgres needs 4 bends: move node alerts or postgres so they share a row or column with matching centers, or sit diagonally with a clear corner."
+    ],
+    "repair": "Trace these relationships at the desktop viewport. For Architecture, use references/architecture-layout-repair.md: reflow a blocked main path or tangled connected scene, and repair an isolated defect locally only when the surrounding composition is accepted. Preserve all semantic content and user-fixed geometry. Rerun finalize once after the edit."
+  }
+}

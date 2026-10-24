@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "a5e4bc8a-bede-470e-9f52-86a9b3f19e99",
+  "status": "current",
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/praneethreddy/Freelance Projects /YOLO/docs/archify-source/upload-workflow.json",
+  "output": "/Users/praneethreddy/Freelance Projects /YOLO/docs/upload-workflow.html",
+  "specification": {
+    "sha256": "faf13a3423b33fab3862758cee791b518312541020a8cdf21e80abc04518b0ab",
+    "bytes": 10008
+  },
+  "artifact": {
+    "sha256": "17fb4060d9cf590b01bc1ec058071b0f7784c993ed254847aa882e0634b6864a",
+    "bytes": 833493
+  }
+}
