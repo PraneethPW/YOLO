@@ -154,28 +154,35 @@ def visitor(request:Request,response:Response):
     raise HTTPException(401,'Sign in or register to access the video dashboard')
 
 
-SOURCE_FIELDS = 'id,name,kind,location,latitude,longitude,status,last_error,created_at,last_frame_at,tracks,fps,archived,is_shared'
+SOURCE_FIELDS = 'id,name,kind,location,latitude,longitude,status,last_error,created_at,last_frame_at,tracks,fps,archived,is_shared,monitor_enabled,credit,reference_url'
+
+
+def recording_availability(rows):
+    for row in rows:
+        if row.get('recording'):
+            row['recording']['media_available'] = Path(row['recording'].pop('_path')).is_file()
+    return rows
 
 
 @app.get('/api/sources')
 def sources(user=Depends(current_user)):
     scope,params=source_scope(user)
     rows=db.query(f'''SELECT {SOURCE_FIELDS},created_by,(SELECT json_build_object('id',j.id,'status',j.status,
-       'replay_status',j.replay_status,'replay_error',j.replay_error) FROM jobs j WHERE j.source_id=s.id
+       'replay_status',j.replay_status,'replay_error',j.replay_error,'_path',j.path) FROM jobs j WHERE j.source_id=s.id
        ORDER BY j.created_at DESC,j.id DESC LIMIT 1) AS recording
        FROM sources s WHERE NOT archived AND {scope} ORDER BY created_at DESC''',params)
     for row in rows:
         row['can_manage']=can_manage_source(row,user)
         row.pop('created_by')
-    return rows
+    return recording_availability(rows)
 
 
 @app.get('/api/library/sources')
 def library_sources(user=Depends(current_user)):
-    return db.query(f'''SELECT {SOURCE_FIELDS},false AS can_manage,(SELECT json_build_object(
-       'id',j.id,'status',j.status,'replay_status',j.replay_status,'replay_error',j.replay_error)
+    return recording_availability(db.query(f'''SELECT {SOURCE_FIELDS},false AS can_manage,(SELECT json_build_object(
+       'id',j.id,'status',j.status,'replay_status',j.replay_status,'replay_error',j.replay_error,'_path',j.path)
        FROM jobs j WHERE j.source_id=s.id ORDER BY j.created_at DESC,j.id DESC LIMIT 1) AS recording
-       FROM sources s WHERE s.is_shared AND s.kind='upload' AND NOT archived ORDER BY s.created_at DESC''')
+       FROM sources s WHERE s.is_shared AND s.kind='upload' AND NOT archived ORDER BY s.created_at DESC'''))
 
 
 class SourceInput(BaseModel):

@@ -57,6 +57,8 @@ The application uses a dedicated `accident_alert` database schema. `DATABASE_SCH
 
 ## Hosting
 
+The shared workspace includes two public traffic-camera feeds and five looping road-video examples. See [MEDIA_SOURCES.md](MEDIA_SOURCES.md) for their providers, credits, provisioning and the distinction between sampled live analysis and recorded playback.
+
 See [DEPLOYMENT.md](DEPLOYMENT.md) for Railway, Vercel, persistent-volume setup, CORS configuration, first-account setup, and webhook verification. Keep one backend replica and one Uvicorn worker: in-process camera tracking belongs to that worker. CPU processing is bounded by actual hardware; processing latency is visible in the webcam view. Larger camera fleets need a separate inference-worker pool and object storage.
 
 ## Verification

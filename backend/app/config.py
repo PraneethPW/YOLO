@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     max_upload_mb: int = 100
     auto_alert_candidates: bool = False
     worker_enabled: bool = True
+    stream_sample_fps: float = 1.0
 
     @property
     def media(self) -> Path:

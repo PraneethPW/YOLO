@@ -259,32 +259,50 @@ def build_replay(job):
 
 
 def run_stream(source, stop):
-    cap = None
+    attempts = 0
     try:
-        safe_url(source['stream_url'],settings.camera_allowed_hosts,('https','http','rtsp','rtsps'))
-        cap = cv2.VideoCapture(source['stream_url'],cv2.CAP_FFMPEG,
-                [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC,15000,cv2.CAP_PROP_READ_TIMEOUT_MSEC,10000])
-        if not cap.isOpened():
-            raise ValueError('Camera connection failed. Verify stream URL and network access.')
-        db.query("UPDATE sources SET status='live',last_error=NULL WHERE id=%s", (source['id'],))
-        last = 0
         while not stop.is_set() and not shutdown.is_set():
-            ok,frame = cap.read()
-            if not ok:
-                raise ValueError('Camera stream disconnected. Restart monitoring to reconnect.')
-            now = time.monotonic()
-            if now-last < 0.3:
-                continue
-            process_frame(source['id'],frame,now)
-            last = now
+            cap = None
+            received = False
+            try:
+                safe_url(source['stream_url'],settings.camera_allowed_hosts,('https','http','rtsp','rtsps'))
+                cap = cv2.VideoCapture(source['stream_url'],cv2.CAP_FFMPEG,
+                    [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC,15000,cv2.CAP_PROP_READ_TIMEOUT_MSEC,10000])
+                if not cap.isOpened():
+                    raise ValueError('Camera connection failed')
+                last = 0
+                interval = 1 / max(.2,min(5,settings.stream_sample_fps))
+                while not stop.is_set() and not shutdown.is_set():
+                    ok,frame = cap.read()
+                    if not ok:
+                        raise ValueError('Camera stream disconnected')
+                    now = time.monotonic()
+                    if now-last < interval:
+                        continue
+                    process_frame(source['id'],frame,now)
+                    if not received:
+                        db.query("UPDATE sources SET status='live',last_error=NULL WHERE id=%s",(source['id'],))
+                        db.event('source',{'id':str(source['id'])})
+                    received = True
+                    attempts = 0
+                    last = now
+            except Exception as exc:
+                if stop.is_set() or shutdown.is_set():
+                    break
+                db.query("UPDATE sources SET status='error',last_error=%s WHERE id=%s",
+                    ('Camera connection interrupted. Retrying automatically.',source['id']))
+                db.event('source',{'id':str(source['id'])})
+                log.warning('Camera reconnecting: %s',type(exc).__name__)
+                attempts += 1
+            finally:
+                if cap:
+                    cap.release()
+                detector.reset(str(source['id']))
+            if stop.is_set() or shutdown.is_set():
+                break
+            stop.wait(min(30,2 ** min(attempts,5)))
         db.query("UPDATE sources SET status='idle' WHERE id=%s", (source['id'],))
-    except Exception as exc:
-        # Never expose a stream URL in an exception or audit record.
-        db.query("UPDATE sources SET status='error',last_error=%s WHERE id=%s", ('Camera processing failed. Check server logs and stream access.',source['id']))
-        log.error('Camera worker failed: %s',type(exc).__name__)
     finally:
-        if cap:
-            cap.release()
         detector.reset(str(source['id']))
         with stream_lock:
             streams.pop(str(source['id']),None)
@@ -294,9 +312,13 @@ def run_stream(source, stop):
 def start_stream(source):
     with stream_lock:
         if str(source['id']) in streams:
+            if streams[str(source['id'])][0].is_set():
+                raise ValueError('Camera is stopping. Try again shortly.')
             return
         if len(streams) >= 3:
             raise ValueError('This deployment supports up to three concurrent CCTV sources')
+        safe_url(source['stream_url'],settings.camera_allowed_hosts,('https','http','rtsp','rtsps'))
+        db.query('UPDATE sources SET monitor_enabled=true WHERE id=%s',(source['id'],))
         stop = threading.Event()
         thread = threading.Thread(target=run_stream,args=(source,stop),daemon=True)
         streams[str(source['id'])] = (stop,thread)
@@ -304,10 +326,19 @@ def start_stream(source):
 
 
 def stop_stream(source_id):
+    db.query('UPDATE sources SET monitor_enabled=false WHERE id=%s',(source_id,))
     with stream_lock:
         entry = streams.get(str(source_id))
         if entry:
             entry[0].set()
+
+
+def resume_streams():
+    for source in db.query("SELECT * FROM sources WHERE kind='stream' AND monitor_enabled AND NOT archived ORDER BY created_at"):
+        try:
+            start_stream(source)
+        except Exception as exc:
+            log.warning('Camera could not resume: %s',type(exc).__name__)
 
 
 def alert_worker():
@@ -362,6 +393,7 @@ def start():
     threading.Thread(target=video_worker,daemon=True).start()
     threading.Thread(target=alert_worker,daemon=True).start()
     threading.Thread(target=lease_worker,daemon=True).start()
+    resume_streams()
 
 
 def lease_worker():

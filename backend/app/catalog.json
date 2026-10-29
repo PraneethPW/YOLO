@@ -1,0 +1,13 @@
+{
+  "recordings": [
+    {"filename":"car-detection.mp4","name":"Intel · car-detection","url":"https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/car-detection.mp4","credit":"Intel IoT DevKit · CC BY 4.0 · annotated replay","reference_url":"https://github.com/intel-iot-devkit/sample-videos"},
+    {"filename":"person-bicycle-car-detection.mp4","name":"Intel · street traffic","url":"https://raw.githubusercontent.com/intel-iot-devkit/sample-videos/master/person-bicycle-car-detection.mp4","credit":"Intel IoT DevKit · CC BY 4.0 · annotated replay","reference_url":"https://github.com/intel-iot-devkit/sample-videos"},
+    {"filename":"vehicles.mp4","name":"Roboflow · vehicles","url":"https://media.roboflow.com/supervision/video-examples/vehicles.mp4","credit":"Roboflow Supervision demo footage · annotated replay","reference_url":"https://supervision.roboflow.com/0.28.0/assets/"},
+    {"filename":"vehicles-2.mp4","name":"Roboflow · vehicles 2","url":"https://media.roboflow.com/supervision/video-examples/vehicles-2.mp4","credit":"Roboflow Supervision demo footage · annotated replay","reference_url":"https://supervision.roboflow.com/0.28.0/assets/"},
+    {"filename":"motorway-a40.mp4","name":"Motorway A40 · recorded traffic","url":"https://raw.githubusercontent.com/safdar-hussain1/trafficlens/main/web/public/clips/motorway-a40.mp4","credit":"Sounds of Changes · CC BY 3.0 · 20s excerpt, resized, silent, annotated","reference_url":"https://commons.wikimedia.org/wiki/File:Motorway_A40_-_on_bridge_above_the_traffic.webm"}
+  ],
+  "cameras": [
+    {"name":"Caltrans · I-5 at Pocket Road","stream_url":"https://wzmedia.dot.ca.gov/D3/5_Pocket_Rd_OC_SAC5_SB.stream/playlist.m3u8","location":"I-5 at Pocket Road · Sacramento, California","latitude":38.481128,"longitude":-121.510528},
+    {"name":"Caltrans · I-5 at Florin Road","stream_url":"https://wzmedia.dot.ca.gov/D3/5_Florin_Rd_SAC5_MD.stream/playlist.m3u8","location":"I-5 at Florin Road · Sacramento, California","latitude":38.495353,"longitude":-121.51647}
+  ]
+}
