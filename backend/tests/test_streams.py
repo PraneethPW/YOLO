@@ -1,6 +1,15 @@
 import threading
+import pytest
 from app import worker
 from app.main import recording_availability
+
+
+@pytest.mark.parametrize('fps,expected',[(30,1/30),(0,1/25),(float('nan'),1/25)])
+def test_hls_segments_are_paced_at_a_valid_video_rate(fps,expected):
+    class Capture:
+        def get(self, key): return fps
+    assert worker.stream_frame_period('https://camera.example/live.m3u8',Capture())==expected
+    assert worker.stream_frame_period('rtsp://camera.example/live',Capture())==0
 
 
 def test_camera_reconnects_and_releases_each_capture(monkeypatch):

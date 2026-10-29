@@ -2,11 +2,13 @@ import hashlib
 import hmac
 import json
 import logging
+import math
 import os
 import threading
 import time
 from datetime import datetime, timezone
 from uuid import uuid4
+from urllib.parse import urlsplit
 import cv2
 import httpx
 from psycopg import OperationalError, InterfaceError
@@ -258,6 +260,15 @@ def build_replay(job):
         db.event('job',{'id':str(job['id'])})
 
 
+def stream_frame_period(url, capture):
+    # HLS arrives in segments. Pace decoded frames so each segment contributes
+    # continuous observations instead of one observation followed by a long gap.
+    if not urlsplit(url).path.lower().endswith('.m3u8'):
+        return 0
+    fps=capture.get(cv2.CAP_PROP_FPS)
+    return 1 / (fps if math.isfinite(fps) and 1<=fps<=120 else 25)
+
+
 def run_stream(source, stop):
     attempts = 0
     try:
@@ -273,7 +284,13 @@ def run_stream(source, stop):
                     raise ValueError('Camera connection failed')
                 last = 0
                 interval = 1 / max(.2,min(5,settings.stream_sample_fps))
+                period = stream_frame_period(source['stream_url'],cap)
+                next_frame_at = time.monotonic()
                 while not stop.is_set() and not shutdown.is_set():
+                    if period:
+                        if stop.wait(max(0,next_frame_at-time.monotonic())):
+                            break
+                        next_frame_at=max(next_frame_at,time.monotonic()-.5)+period
                     ok,frame = cap.read()
                     if not ok:
                         raise ValueError('Camera stream disconnected')

@@ -12,6 +12,7 @@ The camera URLs and coordinates come from [Caltrans' District 3 CCTV catalog](ht
 Monitoring runs on the backend, reconnects with bounded backoff and resumes after application restarts. Operators can stop it; that choice is persisted. Registered members have read-only access to the shared cameras. Only explicitly allowlisted hosts may be connected; this deployment uses `CAMERA_ALLOWED_HOSTS=wzmedia.dot.ca.gov`.
 
 The camera read timeout defaults to 30 seconds (`STREAM_READ_TIMEOUT_MS=30000`) to accommodate the provider's roughly 10–11 second HLS segments without reconnecting at each segment boundary.
+HLS decoding is paced at the published video frame rate so received segments produce continuous sampled observations rather than bursts with long gaps. Frame freshness is the time since this server analyzed a frame; it does not measure the provider's upstream HLS delay.
 
 ## Recorded examples
 
