@@ -267,7 +267,8 @@ def run_stream(source, stop):
             try:
                 safe_url(source['stream_url'],settings.camera_allowed_hosts,('https','http','rtsp','rtsps'))
                 cap = cv2.VideoCapture(source['stream_url'],cv2.CAP_FFMPEG,
-                    [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC,15000,cv2.CAP_PROP_READ_TIMEOUT_MSEC,10000])
+                    [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC,15000,cv2.CAP_PROP_READ_TIMEOUT_MSEC,
+                     max(15000,settings.stream_read_timeout_ms)])
                 if not cap.isOpened():
                     raise ValueError('Camera connection failed')
                 last = 0

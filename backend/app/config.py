@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     auto_alert_candidates: bool = False
     worker_enabled: bool = True
     stream_sample_fps: float = 1.0
+    stream_read_timeout_ms: int = 30000
 
     @property
     def media(self) -> Path:
