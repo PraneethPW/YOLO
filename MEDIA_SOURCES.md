@@ -37,3 +37,12 @@ python -m app.provision_catalog
 ```
 
 This downloads the five published examples, restores matching shared recordings or creates a deterministic new recording, and queues real analysis. It also configures the two shared live sources with monitoring enabled. Restart the application once after initial provisioning so the enabled cameras resume. Re-running the command preserves completed replays already on disk. It requires an existing administrator account and does not run automatically on each startup.
+
+## Historical accident cases
+
+Provision explicitly with `python -m app.provision_cases`. These two non-graphic dashcam excerpts are historical case studies, not live emergencies or claimed automatic detections. Commons classifies these files as public-domain footage from automated cameras:
+
+- [Multiple cars rear-end collision on highway](https://commons.wikimedia.org/wiki/File:Multiple_cars_rear-end_collision_on_highway.webm): 14-second silent excerpt starting at 14 seconds; human-selected reference evidence at 8 seconds in the excerpt.
+- [Lane change causing rear-end collision](https://commons.wikimedia.org/wiki/File:The_van_in_front_suddenly_changed_lanes_and_caused_the_vehicle_to_rear-end_collision.webm): first 12 seconds, silent; human-selected reference at 4.5 seconds. Purple highlight overlay is present in the original.
+
+Excerpts are resized and converted to H.264, then analyzed for vehicle tracking. Reference annotations are explicitly separate from motion-rule candidates. Private practice decisions never enqueue external alerts or count toward operational totals.

@@ -23,6 +23,8 @@ from . import db, worker, analytics, replay
 from .config import settings
 from .detector import detector
 from .limits import BodyLimitMiddleware
+from .incident_service import (INCIDENT_SELECT,incident_scope,decorate as incident_details,
+                               create_report,create_practice)
 from .security import access,admin,audit,current_user,digest,hasher,password_ok,safe_url,session,throttle,source_scope,can_manage_source
 
 logging.basicConfig(level=logging.INFO)
@@ -154,7 +156,7 @@ def visitor(request:Request,response:Response):
     raise HTTPException(401,'Sign in or register to access the video dashboard')
 
 
-SOURCE_FIELDS = 'id,name,kind,location,latitude,longitude,status,last_error,created_at,last_frame_at,tracks,fps,archived,is_shared,monitor_enabled,credit,reference_url'
+SOURCE_FIELDS = 'id,name,kind,location,latitude,longitude,status,last_error,created_at,last_frame_at,tracks,fps,archived,is_shared,monitor_enabled,credit,reference_url,is_case_study'
 
 
 def recording_availability(rows):
@@ -392,8 +394,6 @@ def retry_job(identity:UUID,user=Depends(current_user)):
     return {'ok':True}
 
 
-INCIDENT_SELECT = '''SELECT i.*,s.name AS source_name,s.location,s.latitude,s.longitude,s.kind AS source_kind
-                      FROM incidents i JOIN sources s ON s.id=i.source_id'''
 
 
 @app.get('/api/sources/{identity}/analytics')
@@ -411,10 +411,10 @@ def source_analytics(identity:UUID,job_id:UUID|None=None,window_minutes:int=60,u
         raise HTTPException(422,'Live feeds use a time window rather than a recording')
     data=analytics.read(identity,job_id,minutes)
     events=db.query(INCIDENT_SELECT+''' WHERE i.source_id=%s AND
-       ((%s::uuid IS NOT NULL AND i.job_id=%s) OR (%s::uuid IS NULL AND i.job_id IS NULL
+       (i.reported_by IS NULL OR i.reported_by=%s) AND ((%s::uuid IS NOT NULL AND i.job_id=%s) OR (%s::uuid IS NULL AND i.job_id IS NULL
         AND i.detected_at>=now()-(%s*interval '1 minute'))) ORDER BY i.detected_at DESC LIMIT 501''',
-       (identity,job_id,job_id,job_id,minutes))
-    return {**data,'recording':recording,'events':events[:500],'events_truncated':len(events)>500}
+       (identity,user['id'],job_id,job_id,job_id,minutes))
+    return {**data,'recording':recording,'events':incident_details(events[:500],user),'events_truncated':len(events)>500}
 
 
 @app.post('/api/jobs/{identity}/analytics/start')
@@ -494,22 +494,85 @@ def review_feedback(identity:UUID,payload:FeedbackReview,user=Depends(admin)):
     return {'ok':True}
 
 
+@app.get('/api/notifications')
+def notifications(user=Depends(current_user)):
+    scope,params=incident_scope(user)
+    unread='(r.seen_at IS NULL OR r.seen_at<coalesce(i.reviewed_at,i.detected_at))'
+    select=INCIDENT_SELECT.replace('SELECT i.*,',f'SELECT i.*,{unread} AS unread,count(*) FILTER(WHERE {unread}) OVER() AS _unread_count,')
+    rows=db.query(select+f''' LEFT JOIN incident_reads r ON r.incident_id=i.id AND r.user_id=%s
+        WHERE {scope} AND (NOT i.is_training OR i.reported_by=%s)
+        AND i.detected_at>now()-interval '7 days' ORDER BY i.detected_at DESC LIMIT 100''',
+        (user['id'],*params,user['id']))
+    count=int(rows[0]['_unread_count']) if rows else 0
+    for row in rows:
+        row.pop('_unread_count',None)
+    return {'items':incident_details(rows,user),'unread_count':count}
+
+
+@app.post('/api/notifications/{identity}/read')
+def read_notification(identity:UUID,user=Depends(current_user)):
+    get_incident(identity,user)
+    db.query('''INSERT INTO incident_reads(user_id,incident_id) VALUES(%s,%s)
+        ON CONFLICT(user_id,incident_id) DO UPDATE SET seen_at=now()''',(user['id'],identity))
+    return {'ok':True}
+
+
+class IncidentReport(BaseModel):
+    source_id:UUID
+    job_id:UUID|None=None
+    video_seconds:float=Field(default=0,ge=0,le=86400,allow_inf_nan=False)
+    notes:str=Field(min_length=10,max_length=3000)
+
+
+@app.post('/api/incidents/report',status_code=201)
+def report_incident(body:IncidentReport,user=Depends(current_user)):
+    throttle(('incident-report',str(user['id'])),10,300)
+    source=get_source(body.source_id,user)
+    job=None
+    if source['kind']=='upload':
+        job=db.query('''SELECT * FROM jobs WHERE source_id=%s AND (%s::uuid IS NULL OR id=%s)
+            ORDER BY created_at DESC LIMIT 1''',(body.source_id,body.job_id,body.job_id),one=True)
+        if not job:
+            raise HTTPException(404,'Select an available recording for this source')
+    elif body.job_id:
+        raise HTTPException(422,'Live camera reports do not use a recording ID')
+    identity=create_report(source,job,body.video_seconds,body.notes,user)
+    audit(user,'incident.reported',identity)
+    return get_incident(identity,user)
+
+
+@app.post('/api/incidents/{identity}/practice',status_code=201)
+def practice_incident(identity:UUID,user=Depends(current_user)):
+    throttle(('practice-review',str(user['id'])),10,300)
+    reference=get_incident(identity,user)
+    practice=create_practice(reference,user)
+    return get_incident(practice,user)
+
+
 @app.get('/api/incidents')
-def incidents(status:str|None=None,search:str='',limit:int=100,active_only:bool=False,user=Depends(current_user)):
+def incidents(status:str|None=None,search:str='',limit:int=100,active_only:bool=False,reference_only:bool=False,user=Depends(current_user)):
     limit = max(1,min(limit,500))
-    scope,params=source_scope(user)
-    return db.query(INCIDENT_SELECT+f''' WHERE {scope} AND (%s::text IS NULL OR i.status=%s)
+    scope,params=incident_scope(user)
+    category="i.origin='reference' AND i.reported_by IS NULL" if reference_only else '(NOT i.is_training OR i.reported_by=%s)'
+    category_params=() if reference_only else (user['id'],)
+    rows=db.query(INCIDENT_SELECT+f''' WHERE {scope} AND ({category}) AND (%s::text IS NULL OR i.status=%s)
                  AND (NOT %s OR i.status IN ('review','confirmed'))
                  AND (s.name ILIKE %s OR s.location ILIKE %s) ORDER BY i.detected_at DESC LIMIT %s''',
-                 (*params,status,status,active_only,f'%{search[:200]}%',f'%{search[:200]}%',limit))
+                 (*params,*category_params,status,status,active_only,f'%{search[:200]}%',f'%{search[:200]}%',limit))
+    return incident_details(rows,user)
 
 
 def get_incident(identity,user):
-    scope,params=source_scope(user)
+    scope,params=incident_scope(user)
     row = db.query(INCIDENT_SELECT+f' WHERE i.id=%s AND {scope}',(identity,*params),one=True)
     if not row:
         raise HTTPException(404,'Incident was not found')
-    return row
+    return incident_details([row],user)[0]
+
+
+@app.get('/api/incidents/{identity}')
+def incident(identity:UUID,user=Depends(current_user)):
+    return get_incident(identity,user)
 
 
 class IncidentUpdate(BaseModel):
@@ -520,7 +583,8 @@ class IncidentUpdate(BaseModel):
 @app.patch('/api/incidents/{identity}')
 def update_incident(identity:UUID,body:IncidentUpdate,user=Depends(current_user)):
     incident=get_incident(identity,user)
-    get_source(incident['source_id'],user,write=True)
+    if not incident['can_review']:
+        raise HTTPException(403,'Start a private practice review for a published case, or review your own incident report')
     with db.connection() as conn:
         row = conn.execute('SELECT * FROM incidents WHERE id=%s FOR UPDATE',(identity,)).fetchone()
         if not row:
@@ -530,12 +594,13 @@ def update_incident(identity:UUID,body:IncidentUpdate,user=Depends(current_user)
             raise HTTPException(409,'This incident has already changed. Refresh and try again.')
         conn.execute('UPDATE incidents SET status=%s,notes=%s,reviewed_by=%s,reviewed_at=now() WHERE id=%s',
                      (body.status,body.notes,user['id'],identity))
-        if body.status=='confirmed' and user['role'] in ('admin','operator'):
+        if body.status=='confirmed' and not row['is_training'] and user['role'] in ('admin','operator'):
             conn.execute('''INSERT INTO alert_deliveries(id,incident_id,target_id)
                         SELECT gen_random_uuid(),%s,id FROM alert_targets WHERE enabled
                         ON CONFLICT(incident_id,target_id) DO NOTHING''',(identity,))
     audit(user,'incident.'+body.status,identity)
-    db.event('incident',{'id':str(identity),'status':body.status})
+    db.event('incident',{'id':str(identity),'source_id':str(incident['source_id']),
+                        'status':body.status,'is_training':incident['is_training'],'origin':incident['origin']})
     return get_incident(identity,user)
 
 
@@ -548,8 +613,9 @@ async def explain(identity:UUID,user=Depends(current_user)):
     if model!='openrouter/free' and not model.endswith(':free'):
         raise HTTPException(503,'Only free OpenRouter models are permitted by this application')
     incident = await run_in_threadpool(get_incident,identity,user)
-    await run_in_threadpool(get_source,incident['source_id'],user,False,True)
-    context = {k:incident[k] for k in ('status','score','signals','source_kind','video_seconds')}
+    if not incident['can_review']:
+        raise HTTPException(403,'Start a private practice review or use your own report to request an explanation')
+    context = {k:incident[k] for k in ('status','score','signals','source_kind','video_seconds','origin','is_training')}
     # Send only measured signal data. No footage, exact location, or credentials go to the LLM.
     try:
         async with httpx.AsyncClient(timeout=60) as client:
@@ -674,21 +740,21 @@ def retry_recorded_replay(identity:UUID,user=Depends(current_user)):
 
 @app.get('/api/stats')
 def stats(user=Depends(current_user)):
-    scope,params=source_scope(user)
-    values=db.query(f'''SELECT count(*) AS total,count(*) FILTER(WHERE i.status='review') AS review,
-                        count(*) FILTER(WHERE i.status='confirmed') AS confirmed,
-                        count(*) FILTER(WHERE detected_at>now()-interval '24 hours') AS last_day
-                        FROM incidents i JOIN sources s ON s.id=i.source_id WHERE {scope}''',params,one=True)
-    counts=db.query(f'''SELECT count(*) AS sources,
-                       count(*) FILTER(WHERE status='live' AND last_frame_at>now()-interval '30 seconds') AS live
-                       FROM sources s WHERE NOT archived AND {scope}''',params,one=True)
+    scope,params=incident_scope(user)
+    values=db.query(f"""SELECT count(*) AS total,count(*) FILTER(WHERE i.status='review') AS review,
+        count(*) FILTER(WHERE i.status='confirmed') AS confirmed,
+        count(*) FILTER(WHERE detected_at>now()-interval '24 hours') AS last_day
+        FROM incidents i JOIN sources s ON s.id=i.source_id WHERE NOT i.is_training AND {scope}""",params,one=True)
+    source_filter,source_params=source_scope(user)
+    counts=db.query(f"""SELECT count(*) AS sources,
+        count(*) FILTER(WHERE status='live' AND last_frame_at>now()-interval '30 seconds') AS live
+        FROM sources s WHERE NOT archived AND {source_filter}""",source_params,one=True)
     values.update(counts)
     values['delivered']=0 if user['role'] not in ('admin','operator') else db.query("SELECT count(*) AS n FROM alert_deliveries WHERE status='delivered'",one=True)['n']
-    values['timeline']=db.query(f'''SELECT date_trunc('day',detected_at) AS day,count(*) AS count
-                                  FROM incidents i JOIN sources s ON s.id=i.source_id
-                                  WHERE detected_at>now()-interval '7 days' AND {scope} GROUP BY 1 ORDER BY 1''',params)
+    values['timeline']=db.query(f"""SELECT date_trunc('day',detected_at) AS day,count(*) AS count
+        FROM incidents i JOIN sources s ON s.id=i.source_id
+        WHERE NOT i.is_training AND detected_at>now()-interval '7 days' AND {scope} GROUP BY 1 ORDER BY 1""",params)
     return values
-
 
 
 @app.get('/api/events')
@@ -702,8 +768,8 @@ async def events(request:Request,after:int=0,user=Depends(current_user)):
                 break
             rows = await run_in_threadpool(db.query,'''SELECT e.id,e.kind,e.payload FROM events e LEFT JOIN users u ON u.id=e.owner_id
                 LEFT JOIN sources s ON s.id=e.source_id
-                WHERE e.id>%s AND (e.owner_id=%s OR (s.is_shared AND NOT s.archived)
-                OR (%s IN ('admin','operator') AND (u.role IS NULL OR u.role IN ('admin','operator'))))
+                WHERE e.id>%s AND (e.owner_id=%s OR (NOT e.is_private AND ((s.is_shared AND NOT s.archived)
+                OR (%s IN ('admin','operator') AND (u.role IS NULL OR u.role IN ('admin','operator'))))))
                 ORDER BY e.id LIMIT 100''',(cursor,user['id'],user['role']))
             if rows:
                 for row in rows:
@@ -783,10 +849,10 @@ def audit_log(user=Depends(admin)):
 
 @app.get('/api/export')
 def export(user=Depends(current_user)):
-    scope,params=source_scope(user)
-    rows = db.query(INCIDENT_SELECT+f' WHERE {scope} ORDER BY i.detected_at DESC LIMIT 10000',params)
+    scope,params=incident_scope(user)
+    rows = db.query(INCIDENT_SELECT+f' WHERE {scope} AND (NOT i.is_training OR i.reported_by=%s) ORDER BY i.detected_at DESC LIMIT 10000',(*params,user['id']))
     out = io.StringIO()
-    fields = ['id','detected_at','source_name','location','latitude','longitude','status','score','notes']
+    fields = ['id','detected_at','source_name','location','latitude','longitude','status','origin','is_training','score','notes']
     writer = csv.DictWriter(out,fields,extrasaction='ignore')
     writer.writeheader()
     for row in rows:

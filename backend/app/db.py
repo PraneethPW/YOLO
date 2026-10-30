@@ -60,15 +60,17 @@ def query(sql, params=(), one=False):
 def event(kind, payload):
     source_id = payload.get('source_id') or (payload.get('id') if kind in ('source','frame') else None)
     owner = None
-    if source_id:
-        owner = query('SELECT id AS source_id,created_by FROM sources WHERE id=%s',(source_id,),one=True)
-    elif kind in ('job','incident') and payload.get('id'):
-        table = 'jobs' if kind=='job' else 'incidents'
-        owner = query(f'SELECT s.id AS source_id,s.created_by FROM {table} r JOIN sources s ON s.id=r.source_id WHERE r.id=%s',(payload['id'],),one=True)
-    elif kind=='alert' and payload.get('incident_id'):
-        owner = query('SELECT s.id AS source_id,s.created_by FROM incidents i JOIN sources s ON s.id=i.source_id WHERE i.id=%s',(payload['incident_id'],),one=True)
-    query('INSERT INTO events(kind,payload,owner_id,source_id) VALUES(%s,%s::jsonb,%s,%s)',
-          (kind,json.dumps(payload,default=str),owner['created_by'] if owner else None,owner['source_id'] if owner else None))
+    if kind in ('incident','alert'):
+        identity=payload.get('id') if kind=='incident' else payload.get('incident_id')
+        owner=query('''SELECT s.id AS source_id,coalesce(i.reported_by,s.created_by) AS created_by,
+            i.reported_by IS NOT NULL AS is_private FROM incidents i JOIN sources s ON s.id=i.source_id WHERE i.id=%s''',(identity,),one=True)
+    elif source_id:
+        owner=query('SELECT id AS source_id,created_by,false AS is_private FROM sources WHERE id=%s',(source_id,),one=True)
+    elif kind=='job' and payload.get('id'):
+        owner=query('SELECT s.id AS source_id,s.created_by,false AS is_private FROM jobs j JOIN sources s ON s.id=j.source_id WHERE j.id=%s',(payload['id'],),one=True)
+    query('INSERT INTO events(kind,payload,owner_id,source_id,is_private) VALUES(%s,%s::jsonb,%s,%s,%s)',
+          (kind,json.dumps(payload,default=str),owner['created_by'] if owner else None,
+           owner['source_id'] if owner else None,bool(owner and owner['is_private'])))
 
 
 def close():

@@ -38,7 +38,7 @@ def enqueue_alerts(incident_id):
     db.query('''INSERT INTO alert_deliveries(id,incident_id,target_id)
                 SELECT gen_random_uuid(),%s,t.id FROM alert_targets t WHERE t.enabled
                 AND EXISTS (SELECT 1 FROM incidents i JOIN sources s ON s.id=i.source_id
-                            JOIN users u ON u.id=s.created_by WHERE i.id=%s AND u.role IN ('admin','operator'))
+                            JOIN users u ON u.id=s.created_by WHERE i.id=%s AND NOT i.is_training AND i.reported_by IS NULL AND u.role IN ('admin','operator'))
                 ON CONFLICT(incident_id,target_id) DO NOTHING''', (incident_id,incident_id))
     db.event('alert', {'incident_id': str(incident_id)})
 
@@ -70,11 +70,12 @@ def process_frame(source_id, frame, timestamp, job_id=None, video_seconds=None):
             continue
         incident_id = uuid4()
         snapshot = save_jpeg(f'{incident_id}.jpg', annotated)
-        db.query('''INSERT INTO incidents(id,source_id,job_id,score,signals,snapshot_path,video_seconds)
-                    VALUES(%s,%s,%s,%s,%s::jsonb,%s,%s)''',
-                    (incident_id,source_id,job_id,candidate['score'],json.dumps(candidate['signals']),snapshot,video_seconds))
-        db.event('incident', {'id': str(incident_id), 'source_id': str(source_id)})
-        if settings.auto_alert_candidates:
+        db.query('''INSERT INTO incidents(id,source_id,job_id,score,signals,snapshot_path,video_seconds,is_training)
+                    SELECT %s,%s,%s,%s,%s::jsonb,%s,%s,is_case_study FROM sources WHERE id=%s''',
+                    (incident_id,source_id,job_id,candidate['score'],json.dumps(candidate['signals']),snapshot,video_seconds,source_id))
+        training=db.query('SELECT is_training FROM incidents WHERE id=%s',(incident_id,),one=True)['is_training']
+        db.event('incident', {'id': str(incident_id), 'source_id': str(source_id),'is_training':training,'origin':'automated'})
+        if settings.auto_alert_candidates and not training:
             # Explicit operator configuration: message remains marked UNCONFIRMED.
             enqueue_alerts(incident_id)
     return {'tracks': tracks, 'processing_fps': fps, 'candidates': len(candidates),
@@ -110,9 +111,10 @@ def run_job(job):
         tracks=[]
         vision_width=vision_height=1
         while not shutdown.is_set():
-            current = db.query('SELECT status FROM jobs WHERE id=%s', (job['id'],),one=True)
-            if current['status'] == 'cancelled':
-                break
+            if index % stride==0:
+                current = db.query('SELECT status FROM jobs WHERE id=%s', (job['id'],),one=True)
+                if current['status'] == 'cancelled':
+                    break
             # Decode every frame, infer 4 samples per second of source footage.
             ok, frame = capture.read()
             if not ok:

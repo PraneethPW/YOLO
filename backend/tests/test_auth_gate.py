@@ -7,7 +7,7 @@ from app import security
 from app.main import app
 
 identity=str(uuid4())
-paths=['/api/sources','/api/jobs','/api/stats','/api/events','/api/library/sources',
+paths=['/api/notifications','/api/incidents','/api/incidents?reference_only=true',f'/api/incidents/{identity}',f'/api/incidents/{identity}/snapshot','/api/sources','/api/jobs','/api/stats','/api/events','/api/library/sources',
        f'/api/library/jobs/{identity}/replay',f'/api/library/jobs/{identity}/replay/info',
        f'/api/library/sources/{identity}/snapshot',f'/api/jobs/{identity}/replay',
        f'/api/jobs/{identity}/video',f'/api/sources/{identity}/analytics']
